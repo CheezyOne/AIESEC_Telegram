@@ -1,122 +1,363 @@
 <!DOCTYPE html>
 <html lang="en-us">
-  <head>
+<head>
     <meta charset="utf-8">
-    <meta http-equiv="Content-Type" content="text/html; charset=utf-8">
-    <title>Unity WebGL Player | AIESEC</title>
-    <link rel="shortcut icon" href="TemplateData/favicon.ico">
-    <link rel="stylesheet" href="TemplateData/style.css">
-  </head>
-  <body>
-    <div id="unity-container" class="unity-desktop">
-      <canvas id="unity-canvas" width=1080 height=1920 tabindex="-1"></canvas>
-      <div id="unity-loading-bar">
-        <div id="unity-logo"></div>
-        <div id="unity-progress-bar-empty">
-          <div id="unity-progress-bar-full"></div>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, maximum-scale=1.0">
+    <title>Ваша игра</title>
+    <style>
+        html, body {
+            width: 100%;
+            height: 100%;
+            margin: 0;
+            padding: 0;
+            overflow: hidden;
+            position: fixed;
+            background: #000000;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        #unity-container {
+            position: relative;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            width: 100%;
+            height: 100%;
+        }
+
+        #unity-canvas {
+            background: #000000;
+            /* Фиксируем вертикальную ориентацию */
+            width: auto;
+            height: auto;
+            max-width: 100%;
+            max-height: 100%;
+            aspect-ratio: 9/16; /* Фиксируем соотношение сторон для вертикальной ориентации */
+        }
+
+        #unity-loading-bar {
+            position: absolute;
+            left: 50%;
+            top: 50%;
+            transform: translate(-50%, -50%);
+            display: none;
+        }
+
+        #unity-progress-bar-full {
+            width: 0%;
+            height: 20px;
+            background: linear-gradient(90deg, red, orange);
+            transition: width 0.3s;
+        }
+
+        #unity-fullscreen-button {
+            display: none;
+        }
+
+        #unity-warning {
+            position: absolute;
+            top: 10px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(255,255,0,0.8);
+            padding: 10px;
+            display: none;
+            z-index: 1000;
+        }
+
+        /* Стиль для блокировки ориентации на мобильных устройствах */
+        #orientation-warning {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.95);
+            color: white;
+            z-index: 9999;
+            justify-content: center;
+            align-items: center;
+            flex-direction: column;
+            text-align: center;
+            font-family: Arial, sans-serif;
+        }
+
+            #orientation-warning h2 {
+                font-size: 24px;
+                margin-bottom: 20px;
+            }
+
+            #orientation-warning p {
+                font-size: 18px;
+            }
+
+        /* Иконка поворота для наглядности */
+        .rotate-icon {
+            font-size: 48px;
+            margin-bottom: 20px;
+            animation: rotate 2s infinite;
+        }
+
+        @keyframes rotate {
+            0% {
+                transform: rotate(0deg);
+            }
+
+            100% {
+                transform: rotate(90deg);
+            }
+        }
+    </style>
+</head>
+<body>
+    <div id="unity-container">
+        <canvas id="unity-canvas"></canvas>
+        <div id="unity-loading-bar">
+            <div id="unity-progress-bar-full"></div>
         </div>
-      </div>
-      <div id="unity-warning"> </div>
-      <div id="unity-footer">
-        <div id="unity-webgl-logo"></div>
-        <div id="unity-fullscreen-button"></div>
-        <div id="unity-build-title">AIESEC</div>
-      </div>
+        <div id="unity-warning"></div>
+        <button id="unity-fullscreen-button" style="display: none;">Fullscreen</button>
+
+        <!-- Предупреждение о необходимости портретной ориентации -->
+        <div id="orientation-warning">
+            <div class="rotate-icon">🔄</div>
+            <h2>Пожалуйста, переверните устройство</h2>
+            <p>Для игры требуется портретная ориентация</p>
+        </div>
     </div>
+
     <script>
 
-      var container = document.querySelector("#unity-container");
-      var canvas = document.querySelector("#unity-canvas");
-      var loadingBar = document.querySelector("#unity-loading-bar");
-      var progressBarFull = document.querySelector("#unity-progress-bar-full");
-      var fullscreenButton = document.querySelector("#unity-fullscreen-button");
-      var warningBanner = document.querySelector("#unity-warning");
+        // Функция для принудительной вертикальной ориентации
+        function enforcePortraitOrientation() {
+            const canvas = document.querySelector("#unity-canvas");
+            const container = document.querySelector("#unity-container");
+            const orientationWarning = document.querySelector("#orientation-warning");
 
-      // Shows a temporary message banner/ribbon for a few seconds, or
-      // a permanent error message on top of the canvas if type=='error'.
-      // If type=='warning', a yellow highlight color is used.
-      // Modify or remove this function to customize the visually presented
-      // way that non-critical warnings and error messages are presented to the
-      // user.
-      function unityShowBanner(msg, type) {
-        function updateBannerVisibility() {
-          warningBanner.style.display = warningBanner.children.length ? 'block' : 'none';
+            // Всегда используем вертикальное соотношение сторон
+            const targetAspectRatio = 9 / 16; // Вертикальная ориентация
+
+            // Получаем доступные размеры
+            const availableWidth = window.innerWidth;
+            const availableHeight = window.innerHeight;
+            const availableAspectRatio = availableWidth / availableHeight;
+
+            // Всегда устанавливаем вертикальную ориентацию
+            if (availableAspectRatio > targetAspectRatio) {
+                // Широкое окно - центрируем по горизонтали
+                canvas.style.width = "auto";
+                canvas.style.height = "100%";
+
+                // Центрируем canvas в контейнере
+                container.style.justifyContent = "center";
+            } else {
+                // Узкое окно - центрируем по вертикали
+                canvas.style.width = "100%";
+                canvas.style.height = "auto";
+
+                // Центрируем canvas в контейнере
+                container.style.justifyContent = "center";
+            }
+
+            // На мобильных устройствах проверяем ориентацию
+            if (/iPhone|iPad|iPod|Android/i.test(navigator.userAgent)) {
+                checkMobileOrientation();
+            }
+
+            // Отправляем новые размеры в Unity, если игра загружена
+            if (typeof unityInstance !== 'undefined') {
+                const canvasWidth = canvas.clientWidth;
+                const canvasHeight = canvas.clientHeight;
+
+                // Устанавливаем размеры для рендеринга
+                canvas.width = canvasWidth;
+                canvas.height = canvasHeight;
+
+                // Уведомляем Unity об изменении размеров
+                unityInstance.SendMessage('GameManager', 'OnWindowResize',
+                    canvasWidth + ',' + canvasHeight);
+            }
         }
-        var div = document.createElement('div');
-        div.innerHTML = msg;
-        warningBanner.appendChild(div);
-        if (type == 'error') div.style = 'background: red; padding: 10px;';
-        else {
-          if (type == 'warning') div.style = 'background: yellow; padding: 10px;';
-          setTimeout(function() {
-            warningBanner.removeChild(div);
-            updateBannerVisibility();
-          }, 5000);
+
+        function checkMobileOrientation() {
+            const canvas = document.querySelector("#unity-canvas");
+            const orientationWarning = document.querySelector("#orientation-warning");
+
+            // Проверяем, является ли устройство мобильным
+            const isMobileDevice = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
+
+            console.log('Check orientation - is mobile:', isMobileDevice);
+
+            if (!isMobileDevice) {
+                // На ПК всегда скрываем предупреждение и показываем игру
+                orientationWarning.style.display = "none";
+                canvas.style.visibility = "visible";
+                canvas.style.display = "block";
+                return;
+            }
+
+            // Только для мобильных устройств проверяем ориентацию
+            const isLandscape =
+                window.innerWidth > window.innerHeight ||
+                (window.orientation && Math.abs(window.orientation) === 90) ||
+                (screen.orientation && screen.orientation.type.includes('landscape'));
+
+            console.log('Is landscape:', isLandscape);
+
+            if (isLandscape) {
+                // Горизонтальная ориентация - показываем предупреждение
+                orientationWarning.style.display = "flex";
+                canvas.style.visibility = "hidden";
+            } else {
+                // Вертикальная ориентация - скрываем предупреждение
+                orientationWarning.style.display = "none";
+                canvas.style.visibility = "visible";
+            }
         }
-        updateBannerVisibility();
-      }
 
-      var buildUrl = "Build";
-      var loaderUrl = buildUrl + "/Build.loader.js";
-      var config = {
-        dataUrl: buildUrl + "/Build.data",
-        frameworkUrl: buildUrl + "/Build.framework.js",
-        codeUrl: buildUrl + "/Build.wasm",
-        streamingAssetsUrl: "StreamingAssets",
-        companyName: "DefaultCompany",
-        productName: "AIESEC",
-        productVersion: "1.0",
-        showBanner: unityShowBanner,
-      };
+        if (IsTelegramWebApp()) {
+            Telegram.WebApp.ready();
+            Telegram.WebApp.expand();
+            console.log('Telegram WebApp initialized');
+        }
 
-      // By default, Unity keeps WebGL canvas render target size matched with
-      // the DOM size of the canvas element (scaled by window.devicePixelRatio)
-      // Set this to false if you want to decouple this synchronization from
-      // happening inside the engine, and you would instead like to size up
-      // the canvas DOM size and WebGL render target sizes yourself.
-      // config.matchWebGLToCanvasSize = false;
+        // Обработчик изменения размера окна
+        window.addEventListener('resize', function () {
+            enforcePortraitOrientation();
+            checkMobileOrientation();
+        });
 
-      if (/iPhone|iPad|iPod|Android/i.test(navigator.userAgent)) {
-        // Mobile device style: fill the whole browser client area with the game canvas:
+        // Обработчик изменения ориентации на мобильных устройствах
+        window.addEventListener('orientationchange', function () {
+            // Задержка для корректного определения размеров после поворота
+            setTimeout(function () {
+                enforcePortraitOrientation();
+                checkMobileOrientation();
+            }, 300);
+        });
 
-        var meta = document.createElement('meta');
-        meta.name = 'viewport';
-        meta.content = 'width=device-width, height=device-height, initial-scale=1.0, user-scalable=no, shrink-to-fit=yes';
-        document.getElementsByTagName('head')[0].appendChild(meta);
-        container.className = "unity-mobile";
-        canvas.className = "unity-mobile";
+        // Вызываем после полной загрузки страницы
+        window.addEventListener('load', function () {
+            var container = document.querySelector("#unity-container");
+            var canvas = document.querySelector("#unity-canvas");
+            var loadingBar = document.querySelector("#unity-loading-bar");
+            var progressBarFull = document.querySelector("#unity-progress-bar-full");
+            var warningBanner = document.querySelector("#unity-warning");
 
-        // To lower canvas resolution on mobile devices to gain some
-        // performance, uncomment the following line:
-        // config.devicePixelRatio = 1;
+            function unityShowBanner(msg, type) {
+                function updateBannerVisibility() {
+                    warningBanner.style.display = warningBanner.children.length ? 'block' : 'none';
+                }
+                var div = document.createElement('div');
+                div.innerHTML = msg;
+                warningBanner.appendChild(div);
+                if (type == 'error') {
+                    div.style = 'background: red; padding: 10px; color: white;';
+                } else {
+                    if (type == 'warning') {
+                        div.style = 'background: yellow; padding: 10px;';
+                    }
+                    setTimeout(function () {
+                        warningBanner.removeChild(div);
+                        updateBannerVisibility();
+                    }, 5000);
+                }
+                updateBannerVisibility();
+            }
 
-
-      } else {
-        // Desktop style: Render the game canvas in a window that can be maximized to fullscreen:
-
-        canvas.style.width = "1080px";
-        canvas.style.height = "1920px";
-      }
-
-      loadingBar.style.display = "block";
-
-      var script = document.createElement("script");
-      script.src = loaderUrl;
-      script.onload = () => {
-        createUnityInstance(canvas, config, (progress) => {
-          progressBarFull.style.width = 100 * progress + "%";
-              }).then((unityInstance) => {
-                loadingBar.style.display = "none";
-                fullscreenButton.onclick = () => {
-                  unityInstance.SetFullscreen(1);
-                };
-              }).catch((message) => {
-                alert(message);
-              });
+            var buildUrl = "Build";
+            var loaderUrl = buildUrl + "/Build.loader.js";
+            var config = {
+                dataUrl: buildUrl + "/Build.data",
+                frameworkUrl: buildUrl + "/Build.framework.js",
+                codeUrl: buildUrl + "/Build.wasm",
+                streamingAssetsUrl: "StreamingAssets",
+                companyName: "DefaultCompany",
+                productName: "AIESEC",
+                productVersion: "1.0",
+                showBanner: unityShowBanner,
             };
 
-      document.body.appendChild(script);
+            // Настройки для мобильных устройств
+            if (/iPhone|iPad|iPod|Android/i.test(navigator.userAgent)) {
+                var meta = document.createElement('meta');
+                meta.name = 'viewport';
+                meta.content = 'width=device-width, height=device-height, initial-scale=1.0, user-scalable=no, shrink-to-fit=yes';
+                document.getElementsByTagName('head')[0].appendChild(meta);
+            }
 
+            loadingBar.style.display = "block";
+
+            var script = document.createElement("script");
+            script.src = loaderUrl;
+            script.onload = function () {
+                createUnityInstance(canvas, config, function (progress) {
+                    progressBarFull.style.width = 100 * progress + "%";
+                }).then(function (unityInstance) {
+                    loadingBar.style.display = "none";
+
+                    // Устанавливаем правильные размеры
+                    enforcePortraitOrientation();
+                    checkMobileOrientation();
+
+                }).catch(function (message) {
+                    alert(message);
+                });
+            };
+
+            document.body.appendChild(script);
+
+            // Инициализируем ориентацию при загрузке
+            enforcePortraitOrientation();
+            checkMobileOrientation();
+
+            // Периодическая проверка ориентации (для iOS)
+            setInterval(checkMobileOrientation, 1000);
+        });
     </script>
-  </body>
+    <script>
+        window.GetTelegramUserData = function () {
+            if (window.Telegram && window.Telegram.WebApp && Telegram.WebApp.initDataUnsafe.user) {
+                const user = Telegram.WebApp.initDataUnsafe.user;
+                return JSON.stringify({
+                    id: user.id,
+                    username: user.username || '',
+                    first_name: user.first_name || '',
+                    last_name: user.last_name || ''
+                });
+            }
+            return null;
+        };
+
+        window.IsTelegramWebApp = function () {
+            return !!(window.Telegram && window.Telegram.WebApp);
+        };
+
+        window.ShowTelegramAlert = function (message) {
+            if (window.IsTelegramWebApp && window.IsTelegramWebApp()) {
+                Telegram.WebApp.showAlert(message);
+            } else {
+                alert(message);
+            }
+        };
+
+        window.SaveToTelegramStorage = function (key, value) {
+            if (window.IsTelegramWebApp && window.IsTelegramWebApp() && Telegram.WebApp.CloudStorage) {
+                Telegram.WebApp.CloudStorage.setItem(key, value);
+                return true;
+            }
+            return false;
+        };
+
+        window.LoadFromTelegramStorage = function (key) {
+            if (window.IsTelegramWebApp && window.IsTelegramWebApp() && Telegram.WebApp.CloudStorage) {
+                return Telegram.WebApp.CloudStorage.getItem(key);
+            }
+            return null;
+        };
+    </script>
+</body>
 </html>
