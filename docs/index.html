@@ -218,11 +218,11 @@
             }
         }
 
-        /*if (IsTelegramWebApp()) {
+        if (IsTelegramWebApp()) {
             Telegram.WebApp.ready();
             Telegram.WebApp.expand();
             console.log('Telegram WebApp initialized');
-        }*/
+        }
 
         // Обработчик изменения размера окна
         window.addEventListener('resize', function () {
@@ -268,7 +268,7 @@
                 updateBannerVisibility();
             }
 
-            var buildUrl = "Build";
+            var buildUrl = window.location.pathname.split('/').slice(0, -1).join('/') + "/Build";
             var loaderUrl = buildUrl + "/Build.loader.js";
             var config = {
                 dataUrl: buildUrl + "/Build.data",
