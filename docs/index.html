@@ -3,6 +3,8 @@
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, maximum-scale=1.0">
+    <!-- Принудительно используем актуальную версию Telegram WebApp -->
+    <meta name="telegram-web-app-version" content="latest">
     <title>Ваша игра</title>
 
     <!-- Загружаем Telegram WebApp SDK самым первым -->
@@ -164,6 +166,7 @@
             console.log('LoadFromTelegramStorage function available:', typeof window.LoadFromTelegramStorage === 'function');
             console.log('ShowTelegramAlert function available:', typeof window.ShowTelegramAlert === 'function');
         }, 1000);
+
         // Глобальный объект для взаимодействия с Unity
         window.UnityBridge = {
             callbacks: {},
@@ -186,6 +189,7 @@
                     Telegram.WebApp.ready();
                     Telegram.WebApp.expand();
                     console.log('Telegram WebApp initialized successfully');
+                    console.log('WebApp version:', Telegram.WebApp.version);
                 } catch (e) {
                     console.error('Error initializing Telegram WebApp:', e);
                 }
@@ -372,8 +376,47 @@
             setInterval(checkMobileOrientation, 1000);
         });
 
-        window.UnityFunctions = {
+        // Глобальные функции для вызова из Unity
+        window.SaveToTelegramStorage = function (key, value) {
+            try {
+                if (window.isCloudStorageAvailable()) {
+                    Telegram.WebApp.CloudStorage.setItem(key, value);
+                    console.log('Saved to CloudStorage:', key, value);
+                } else {
+                    localStorage.setItem(key, value);
+                    console.log('Saved to localStorage:', key, value);
+                }
+            } catch (e) {
+                console.error('Save error:', e);
+            }
+        };
 
+        window.LoadFromTelegramStorage = function (key) {
+            try {
+                let data = null;
+                if (window.isCloudStorageAvailable()) {
+                    data = Telegram.WebApp.CloudStorage.getItem(key);
+                }
+
+                if (data === null) {
+                    data = localStorage.getItem(key);
+                }
+
+                // Отправляем данные обратно в Unity
+                if (window.unityInstance && window.unityInstance.SendMessage) {
+                    window.unityInstance.SendMessage('SaveLoadSystem', 'OnDataLoaded', data);
+                }
+                console.log('Loaded data for key:', key, data);
+            } catch (e) {
+                console.error('Load error:', e);
+            }
+        };
+
+        window.isCloudStorageAvailable = function () {
+            return !!(window.Telegram && window.Telegram.WebApp && window.Telegram.WebApp.CloudStorage);
+        };
+
+        window.UnityFunctions = {
             isTelegramAvailable: function () {
                 return !!(window.Telegram && window.Telegram.WebApp);
             },
@@ -382,6 +425,7 @@
             isCloudStorageAvailable: function () {
                 return !!(window.Telegram && window.Telegram.WebApp && window.Telegram.WebApp.CloudStorage);
             },
+
             // Получение данных пользователя
             getTelegramUserData: function () {
                 if (window.Telegram && window.Telegram.WebApp && Telegram.WebApp.initDataUnsafe.user) {
