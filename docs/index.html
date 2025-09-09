@@ -5,12 +5,20 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, maximum-scale=1.0">
     <title>Ваша игра</title>
     <script>
-        IsTelegramWebApp = function () {
-            return !!(window.Telegram && window.Telegram.WebApp);
-        };
+        // Явная регистрация в global scope для WebAssembly
+        if (typeof window !== 'undefined') {
+            window.IsTelegramWebApp = function () {
+                return !!(window.Telegram && window.Telegram.WebApp);
+            };
 
-        // 2. Также объявите остальные функции, которые могут вызываться из C#
-        GetTelegramUserData = function () {
+            // Принудительно назначаем в global scope
+            if (typeof IsTelegramWebApp === 'undefined') {
+                IsTelegramWebApp = window.IsTelegramWebApp;
+            }
+        }
+
+        // То же самое для других функций
+        window.GetTelegramUserData = function () {
             if (window.Telegram && window.Telegram.WebApp && Telegram.WebApp.initDataUnsafe.user) {
                 const user = Telegram.WebApp.initDataUnsafe.user;
                 return JSON.stringify({
@@ -23,17 +31,25 @@
             return null;
         };
 
+        if (typeof GetTelegramUserData === 'undefined') {
+            GetTelegramUserData = window.GetTelegramUserData;
+        }
 
-
-        // Для обратной совместимости
-        window.IsTelegramWebApp = IsTelegramWebApp;
-        window.GetTelegramUserData = GetTelegramUserData;
-
-        // Проверка доступности функций
-        console.log('Functions declared:', {
+        console.log('Global functions registered:', {
             IsTelegramWebApp: typeof IsTelegramWebApp,
             GetTelegramUserData: typeof GetTelegramUserData
         });
+
+        console.log('=== DEBUG: Global scope check ===');
+        console.log('window.IsTelegramWebApp:', typeof window.IsTelegramWebApp);
+        console.log('IsTelegramWebApp:', typeof IsTelegramWebApp);
+        console.log('window loaded:', window.loaded);
+
+        // Проверка, что функции доступны сразу
+        if (typeof IsTelegramWebApp !== 'function') {
+            console.error('ERROR: IsTelegramWebApp not found!');
+            IsTelegramWebApp = function () { return false; };
+
     </script>
     <style>
         html, body {
@@ -352,6 +368,7 @@
 
             var script = document.createElement("script");
             script.src = loaderUrl;
+            script.defer = true; // Добавьте defer
             script.onload = function () {
                 createUnityInstance(canvas, config, function (progress) {
                     progressBarFull.style.width = 100 * progress + "%";
