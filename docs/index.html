@@ -9,12 +9,15 @@
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
 
     <script>
-        // ГЛОБАЛЬНЫЕ ФУНКЦИИ ДЛЯ UNITY - ДОЛЖНЫ БЫТЬ ОБЪЯВЛЕНЫ СРАЗУ
+        // КРИТИЧЕСКИ ВАЖНО: объявляем функции ДО загрузки Unity
+        // Эти функции будут немедленно доступны для WebGL
         window.IsTelegramWebApp = function () {
+            console.log('IsTelegramWebApp called');
             return !!(window.Telegram && window.Telegram.WebApp) ? 1 : 0;
         };
 
         window.GetTelegramUserData = function () {
+            console.log('GetTelegramUserData called');
             if (window.Telegram && window.Telegram.WebApp && Telegram.WebApp.initDataUnsafe.user) {
                 const user = Telegram.WebApp.initDataUnsafe.user;
                 return JSON.stringify({
@@ -28,6 +31,7 @@
         };
 
         window.ShowTelegramAlert = function (message) {
+            console.log('ShowTelegramAlert called:', message);
             if (window.Telegram && window.Telegram.WebApp) {
                 try {
                     Telegram.WebApp.showAlert(message);
@@ -41,6 +45,7 @@
         };
 
         window.SaveToTelegramStorage = function (key, value) {
+            console.log('SaveToTelegramStorage called:', key, value);
             if (window.Telegram && window.Telegram.WebApp && Telegram.WebApp.CloudStorage) {
                 try {
                     Telegram.WebApp.CloudStorage.setItem(key, value);
@@ -53,6 +58,7 @@
         };
 
         window.LoadFromTelegramStorage = function (key) {
+            console.log('LoadFromTelegramStorage called:', key);
             if (window.Telegram && window.Telegram.WebApp && Telegram.WebApp.CloudStorage) {
                 try {
                     return Telegram.WebApp.CloudStorage.getItem(key);
@@ -64,6 +70,7 @@
         };
 
         window.RemoveFromTelegramStorage = function (key) {
+            console.log('RemoveFromTelegramStorage called:', key);
             if (window.Telegram && window.Telegram.WebApp && Telegram.WebApp.CloudStorage) {
                 try {
                     Telegram.WebApp.CloudStorage.removeItem(key);
@@ -75,17 +82,23 @@
 
         // Инициализация Telegram WebApp
         function initTelegramWebApp() {
+            console.log('Initializing Telegram WebApp...');
+
             if (window.Telegram && window.Telegram.WebApp) {
-                console.log('Initializing Telegram WebApp...');
                 try {
                     Telegram.WebApp.ready();
                     Telegram.WebApp.expand();
                     console.log('Telegram WebApp initialized successfully');
+
+                    // Дополнительная инициализация, если нужна
+                    if (Telegram.WebApp.initDataUnsafe.user) {
+                        console.log('User data available:', Telegram.WebApp.initDataUnsafe.user);
+                    }
                 } catch (e) {
                     console.error('Error initializing Telegram WebApp:', e);
                 }
             } else {
-                console.log('Telegram WebApp not detected');
+                console.log('Telegram WebApp not detected, using fallback mode');
             }
         }
 
@@ -93,6 +106,21 @@
         window.addEventListener('load', function () {
             console.log('Page loaded, initializing Telegram WebApp...');
             initTelegramWebApp();
+
+            // Проверяем доступность функций
+            console.log('Checking Telegram functions availability...');
+            const functions = [
+                'IsTelegramWebApp',
+                'GetTelegramUserData',
+                'ShowTelegramAlert',
+                'SaveToTelegramStorage',
+                'LoadFromTelegramStorage',
+                'RemoveFromTelegramStorage'
+            ];
+
+            functions.forEach(func => {
+                console.log(`${func}: ${typeof window[func]}`);
+            });
         });
     </script>
 
@@ -244,6 +272,8 @@
     <script>
         // Проверяем доступность функций Telegram
         function checkTelegramFunctions() {
+            console.log('Checking Telegram functions availability...');
+
             const requiredFunctions = [
                 'IsTelegramWebApp',
                 'GetTelegramUserData',
@@ -259,6 +289,8 @@
                 if (typeof window[funcName] !== 'function') {
                     missingFunctions.push(funcName);
                     console.error(`Missing function: ${funcName}`);
+                } else {
+                    console.log(`Function ${funcName} is available`);
                 }
             }
 
@@ -395,8 +427,7 @@
 
             // Обработчик клика по кнопке запуска
             audioStartButton.addEventListener('click', function () {
-                audioStartButton.style.display = "none";
-                loadingBar.style.display = "block";
+                console.log('Start button clicked, checking functions...');
 
                 // Проверяем, что функции Telegram доступны
                 if (!checkTelegramFunctions()) {
@@ -404,15 +435,24 @@
                     unityShowBanner('Some Telegram functions are missing! Using fallback mode.', 'warning');
                 }
 
+                audioStartButton.style.display = "none";
+                loadingBar.style.display = "block";
+
                 // Загружаем Unity
                 var script = document.createElement("script");
                 script.src = loaderUrl;
                 script.onload = function () {
+                    console.log('Unity loader script loaded');
+
                     // Добавляем небольшую задержку для гарантии инициализации
                     setTimeout(function () {
+                        console.log('Creating Unity instance...');
+
                         createUnityInstance(canvas, config, function (progress) {
+                            console.log('Loading progress:', progress);
                             progressBarFull.style.width = 100 * progress + "%";
                         }).then(function (unityInstance) {
+                            console.log('Unity instance created successfully');
                             loadingBar.style.display = "none";
                             enforcePortraitOrientation();
                             checkMobileOrientation();
@@ -432,6 +472,7 @@
                                 }
                             }
                         }).catch(function (message) {
+                            console.error('Unity initialization failed:', message);
                             alert('Unity initialization failed: ' + message);
                             // Показываем кнопку снова при ошибке
                             audioStartButton.style.display = "block";
@@ -440,6 +481,7 @@
                     }, 100);
                 };
                 script.onerror = function () {
+                    console.error('Failed to load Unity script:', loaderUrl);
                     alert("Failed to load Unity script: " + loaderUrl);
                     // Показываем кнопку снова при ошибке
                     audioStartButton.style.display = "block";
