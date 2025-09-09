@@ -5,17 +5,30 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, maximum-scale=1.0">
     <title>Ваша игра</title>
 
-    <!-- Загружаем Telegram WebApp SDK первым делом -->
+    <!-- Загружаем Telegram WebApp SDK самым первым -->
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
 
     <script>
-        // Глобальные переменные для хранения функций
-        window.TelegramFunctions = {
-            IsTelegramWebApp: function () {
+        // Функция для проверки, что Telegram WebApp полностью загружен
+        function waitForTelegram(callback) {
+            if (window.Telegram && window.Telegram.WebApp) {
+                callback();
+            } else {
+                setTimeout(function () {
+                    waitForTelegram(callback);
+                }, 100);
+            }
+        }
+
+        // Инициализируем функции Telegram после полной загрузки WebApp
+        waitForTelegram(function () {
+            // Определяем все функции глобально
+            window.IsTelegramWebApp = function () {
                 return !!(window.Telegram && window.Telegram.WebApp);
-            },
-            GetTelegramUserData: function () {
-                if (window.TelegramFunctions.IsTelegramWebApp()) {
+            };
+
+            window.GetTelegramUserData = function () {
+                if (window.IsTelegramWebApp()) {
                     const user = Telegram.WebApp.initDataUnsafe.user;
                     if (user) {
                         return JSON.stringify({
@@ -27,46 +40,50 @@
                     }
                 }
                 return null;
-            },
-            ShowTelegramAlert: function (message) {
-                if (window.TelegramFunctions.IsTelegramWebApp()) {
+            };
+
+            window.ShowTelegramAlert = function (message) {
+                if (window.IsTelegramWebApp()) {
                     Telegram.WebApp.showAlert(message);
                 } else {
                     alert(message);
                 }
-            },
-            SaveToTelegramStorage: function (key, value) {
-                if (window.TelegramFunctions.IsTelegramWebApp() && Telegram.WebApp.CloudStorage) {
+            };
+
+            window.SaveToTelegramStorage = function (key, value) {
+                if (window.IsTelegramWebApp() && Telegram.WebApp.CloudStorage) {
                     Telegram.WebApp.CloudStorage.setItem(key, value);
                     return true;
                 }
                 return false;
-            },
-            LoadFromTelegramStorage: function (key) {
-                if (window.TelegramFunctions.IsTelegramWebApp() && Telegram.WebApp.CloudStorage) {
+            };
+
+            window.LoadFromTelegramStorage = function (key) {
+                if (window.IsTelegramWebApp() && Telegram.WebApp.CloudStorage) {
                     return Telegram.WebApp.CloudStorage.getItem(key);
                 }
                 return null;
-            },
-            RemoveFromTelegramStorage: function (key) {
-                if (window.TelegramFunctions.IsTelegramWebApp() && Telegram.WebApp.CloudStorage) {
+            };
+
+            window.RemoveFromTelegramStorage = function (key) {
+                if (window.IsTelegramWebApp() && Telegram.WebApp.CloudStorage) {
                     Telegram.WebApp.CloudStorage.removeItem(key);
                 }
+            };
+
+            console.log('Telegram functions initialized at', new Date().toISOString());
+
+            // Инициализируем Telegram WebApp
+            if (window.IsTelegramWebApp()) {
+                Telegram.WebApp.ready();
+                Telegram.WebApp.expand();
+                console.log('Telegram WebApp initialized');
             }
-        };
-
-        // Экспортируем функции в глобальную область видимости для WASM
-        window.IsTelegramWebApp = function () { return window.TelegramFunctions.IsTelegramWebApp(); };
-        window.GetTelegramUserData = function () { return window.TelegramFunctions.GetTelegramUserData(); };
-        window.ShowTelegramAlert = function (message) { window.TelegramFunctions.ShowTelegramAlert(message); };
-        window.SaveToTelegramStorage = function (key, value) { return window.TelegramFunctions.SaveToTelegramStorage(key, value); };
-        window.LoadFromTelegramStorage = function (key) { return window.TelegramFunctions.LoadFromTelegramStorage(key); };
-        window.RemoveFromTelegramStorage = function (key) { window.TelegramFunctions.RemoveFromTelegramStorage(key); };
-
-        console.log('Telegram functions initialized at', new Date().toISOString());
+        });
     </script>
 
     <style>
+        /* Стили остаются без изменений */
         html, body {
             width: 100%;
             height: 100%;
@@ -169,6 +186,29 @@
                 transform: rotate(90deg);
             }
         }
+
+        /* Стиль для кнопки запуска аудио */
+        #audio-start-button {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            padding: 15px 30px;
+            font-size: 18px;
+            background: linear-gradient(45deg, #ff6b6b, #ff8e53);
+            border: none;
+            border-radius: 50px;
+            color: white;
+            cursor: pointer;
+            z-index: 10000;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+            transition: all 0.3s ease;
+        }
+
+            #audio-start-button:hover {
+                transform: translate(-50%, -50%) scale(1.05);
+                box-shadow: 0 6px 20px rgba(0,0,0,0.3);
+            }
     </style>
 </head>
 <body>
@@ -180,6 +220,10 @@
         <div id="unity-warning"></div>
         <button id="unity-fullscreen-button" style="display: none;">Fullscreen</button>
 
+        <!-- Кнопка для запуска аудио -->
+        <button id="audio-start-button" style="display: none;">Начать игру</button>
+
+        <!-- Предупреждение о необходимости портретной ориентации -->
         <div id="orientation-warning">
             <div class="rotate-icon">🔄</div>
             <h2>Пожалуйста, переверните устройство</h2>
@@ -265,15 +309,6 @@
             }
         }
 
-        // Инициализируем Telegram WebApp если доступно
-        function initTelegramWebApp() {
-            if (window.IsTelegramWebApp && window.IsTelegramWebApp()) {
-                Telegram.WebApp.ready();
-                Telegram.WebApp.expand();
-                console.log('Telegram WebApp initialized');
-            }
-        }
-
         // Обработчики событий
         window.addEventListener('resize', function () {
             enforcePortraitOrientation();
@@ -290,17 +325,13 @@
         // Основная функция загрузки
         window.addEventListener('load', function () {
             console.log('Page loaded, checking Telegram functions...');
-            if (!checkTelegramFunctions()) {
-                console.error('Some Telegram functions are missing!');
-            }
-
-            initTelegramWebApp();
 
             var container = document.querySelector("#unity-container");
             var canvas = document.querySelector("#unity-canvas");
             var loadingBar = document.querySelector("#unity-loading-bar");
             var progressBarFull = document.querySelector("#unity-progress-bar-full");
             var warningBanner = document.querySelector("#unity-warning");
+            var audioStartButton = document.querySelector("#audio-start-button");
 
             function unityShowBanner(msg, type) {
                 function updateBannerVisibility() {
@@ -343,28 +374,52 @@
                 document.getElementsByTagName('head')[0].appendChild(meta);
             }
 
-            loadingBar.style.display = "block";
+            // Показываем кнопку запуска аудио
+            audioStartButton.style.display = "block";
 
-            var script = document.createElement("script");
-            script.src = loaderUrl;
-            script.onload = function () {
-                // Небольшая задержка для гарантии инициализации функций
-                setTimeout(function () {
+            // Обработчик клика по кнопке запуска аудио
+            audioStartButton.addEventListener('click', function () {
+                audioStartButton.style.display = "none";
+                loadingBar.style.display = "block";
+
+                // Загружаем Unity только после клика пользователя
+                var script = document.createElement("script");
+                script.src = loaderUrl;
+                script.onload = function () {
+                    // Проверяем, что функции Telegram доступны
+                    if (!checkTelegramFunctions()) {
+                        console.error('Some Telegram functions are missing!');
+                        unityShowBanner('Telegram functions not loaded!', 'error');
+                    }
+
+                    // Создаем экземпляр Unity
                     createUnityInstance(canvas, config, function (progress) {
                         progressBarFull.style.width = 100 * progress + "%";
                     }).then(function (unityInstance) {
                         loadingBar.style.display = "none";
                         enforcePortraitOrientation();
                         checkMobileOrientation();
+
+                        // Решаем проблему с AudioContext :cite[4]:cite[6]:cite[8]
+                        if (typeof unityInstance.Module !== 'undefined') {
+                            try {
+                                // Пытаемся возобновить аудио контекст
+                                if (typeof unityInstance.Module.audioContext !== 'undefined') {
+                                    unityInstance.Module.audioContext.resume();
+                                }
+                            } catch (e) {
+                                console.warn('AudioContext resume failed:', e);
+                            }
+                        }
                     }).catch(function (message) {
-                        alert(message);
+                        alert('Unity initialization failed: ' + message);
                     });
-                }, 100);
-            };
-            script.onerror = function () {
-                alert("Failed to load Unity script: " + loaderUrl);
-            };
-            document.body.appendChild(script);
+                };
+                script.onerror = function () {
+                    alert("Failed to load Unity script: " + loaderUrl);
+                };
+                document.body.appendChild(script);
+            });
 
             enforcePortraitOrientation();
             checkMobileOrientation();
