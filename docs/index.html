@@ -9,124 +9,82 @@
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
 
     <script>
-        // Глобальный объект для хранения функций Telegram
-        window.TelegramAPI = {
-            initialized: false,
-            functions: {},
+        // Предварительно объявляем функции-заглушки
+        window.IsTelegramWebApp = function () { return false; };
+        window.GetTelegramUserData = function () { return null; };
+        window.ShowTelegramAlert = function (message) { alert(message); return false; };
+        window.SaveToTelegramStorage = function (key, value) { return false; };
+        window.LoadFromTelegramStorage = function (key) { return null; };
+        window.RemoveFromTelegramStorage = function (key) { return false; };
 
-            // Инициализация API Telegram
-            init: function () {
-                console.log('Initializing Telegram API...');
+        // Основная инициализация Telegram API
+        document.addEventListener('DOMContentLoaded', function () {
+            if (window.Telegram && window.Telegram.WebApp) {
+                console.log('Telegram WebApp detected, upgrading functions...');
 
-                // Проверяем, доступен ли Telegram WebApp
-                this.functions.IsTelegramWebApp = function () {
-                    return !!(window.Telegram && window.Telegram.WebApp);
+                // Переопределяем функции на реальные
+                window.IsTelegramWebApp = function () { return true; };
+
+                window.GetTelegramUserData = function () {
+                    try {
+                        const user = Telegram.WebApp.initDataUnsafe.user;
+                        return user ? JSON.stringify({
+                            id: user.id,
+                            username: user.username || '',
+                            first_name: user.first_name || '',
+                            last_name: user.last_name || ''
+                        }) : null;
+                    } catch (e) {
+                        console.error('Error getting user data:', e);
+                        return null;
+                    }
                 };
 
-                // Если Telegram доступен, инициализируем все функции
-                if (this.functions.IsTelegramWebApp()) {
-                    console.log('Telegram WebApp detected, initializing functions...');
-
-                    this.functions.GetTelegramUserData = function () {
-                        try {
-                            const user = Telegram.WebApp.initDataUnsafe.user;
-                            if (user) {
-                                return JSON.stringify({
-                                    id: user.id,
-                                    username: user.username || '',
-                                    first_name: user.first_name || '',
-                                    last_name: user.last_name || ''
-                                });
-                            }
-                        } catch (e) {
-                            console.error('Error getting Telegram user data:', e);
-                        }
-                        return null;
-                    };
-
-                    this.functions.ShowTelegramAlert = function (message) {
-                        try {
-                            Telegram.WebApp.showAlert(message);
-                            return true;
-                        } catch (e) {
-                            console.error('Error showing Telegram alert:', e);
-                            alert(message);
-                            return false;
-                        }
-                    };
-
-                    this.functions.SaveToTelegramStorage = function (key, value) {
-                        try {
-                            if (Telegram.WebApp.CloudStorage) {
-                                Telegram.WebApp.CloudStorage.setItem(key, value);
-                                return true;
-                            }
-                        } catch (e) {
-                            console.error('Error saving to Telegram storage:', e);
-                        }
-                        return false;
-                    };
-
-                    this.functions.LoadFromTelegramStorage = function (key) {
-                        try {
-                            if (Telegram.WebApp.CloudStorage) {
-                                return Telegram.WebApp.CloudStorage.getItem(key);
-                            }
-                        } catch (e) {
-                            console.error('Error loading from Telegram storage:', e);
-                        }
-                        return null;
-                    };
-
-                    this.functions.RemoveFromTelegramStorage = function (key) {
-                        try {
-                            if (Telegram.WebApp.CloudStorage) {
-                                Telegram.WebApp.CloudStorage.removeItem(key);
-                                return true;
-                            }
-                        } catch (e) {
-                            console.error('Error removing from Telegram storage:', e);
-                        }
-                        return false;
-                    };
-
-                    // Инициализируем Telegram WebApp
+                window.ShowTelegramAlert = function (message) {
                     try {
-                        Telegram.WebApp.ready();
-                        Telegram.WebApp.expand();
-                        console.log('Telegram WebApp initialized successfully');
+                        Telegram.WebApp.showAlert(message);
+                        return true;
                     } catch (e) {
-                        console.error('Error initializing Telegram WebApp:', e);
+                        console.error('Error showing alert:', e);
+                        alert(message);
+                        return false;
                     }
-                } else {
-                    console.log('Telegram WebApp not detected, using fallback functions');
+                };
 
-                    // Заглушки для режима вне Telegram
-                    this.functions.GetTelegramUserData = function () { return null; };
-                    this.functions.ShowTelegramAlert = function (message) { alert(message); return false; };
-                    this.functions.SaveToTelegramStorage = function (key, value) { return false; };
-                    this.functions.LoadFromTelegramStorage = function (key) { return null; };
-                    this.functions.RemoveFromTelegramStorage = function (key) { return false; };
-                }
+                window.SaveToTelegramStorage = function (key, value) {
+                    try {
+                        Telegram.WebApp.CloudStorage.setItem(key, value);
+                        return true;
+                    } catch (e) {
+                        console.error('Error saving to storage:', e);
+                        return false;
+                    }
+                };
 
-                // Экспортируем функции в глобальную область видимости
-                for (const [name, func] of Object.entries(this.functions)) {
-                    window[name] = func;
-                }
+                window.LoadFromTelegramStorage = function (key) {
+                    try {
+                        return Telegram.WebApp.CloudStorage.getItem(key);
+                    } catch (e) {
+                        console.error('Error loading from storage:', e);
+                        return null;
+                    }
+                };
 
-                this.initialized = true;
-                console.log('Telegram API initialized at', new Date().toISOString());
+                window.RemoveFromTelegramStorage = function (key) {
+                    try {
+                        Telegram.WebApp.CloudStorage.removeItem(key);
+                        return true;
+                    } catch (e) {
+                        console.error('Error removing from storage:', e);
+                        return false;
+                    }
+                };
 
-                // Уведомляем о готовности
-                if (typeof window.onTelegramAPIReady === 'function') {
-                    window.onTelegramAPIReady();
-                }
+                // Инициализируем Telegram WebApp
+                Telegram.WebApp.ready();
+                Telegram.WebApp.expand();
             }
-        };
-
-        // Инициализируем API Telegram сразу после загрузки страницы
-        document.addEventListener('DOMContentLoaded', function () {
-            window.TelegramAPI.init();
+            console.log('Telegram functions initialized at', new Date().toISOString());
         });
     </script>
 
