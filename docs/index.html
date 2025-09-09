@@ -5,40 +5,52 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, maximum-scale=1.0">
     <title>Ваша игра</title>
     <script>
-        // Регистрируем функции в глобальной области видимости для WebAssembly
-        (function () {
-            // Функция для проверки Telegram WebApp
-            window.IsTelegramWebApp = function () {
-                console.log('IsTelegramWebApp called');
-                return !!(window.Telegram && window.Telegram.WebApp);
-            };
+        // Определяем все функции глобально ДО загрузки Unity
+        window.IsTelegramWebApp = function () {
+            return !!(window.Telegram && window.Telegram.WebApp);
+        };
 
-            // Функция для получения данных пользователя Telegram
-            window.GetTelegramUserData = function () {
-                console.log('GetTelegramUserData called');
-                if (window.Telegram && window.Telegram.WebApp && Telegram.WebApp.initDataUnsafe.user) {
-                    const user = Telegram.WebApp.initDataUnsafe.user;
-                    return JSON.stringify({
-                        id: user.id,
-                        username: user.username || '',
-                        first_name: user.first_name || '',
-                        last_name: user.last_name || ''
-                    });
-                }
-                return null;
-            };
-
-            // Явно регистрируем функции в глобальной области видимости
-            if (typeof IsTelegramWebApp === 'undefined') {
-                IsTelegramWebApp = window.IsTelegramWebApp;
+        window.GetTelegramUserData = function () {
+            if (IsTelegramWebApp()) {
+                const user = Telegram.WebApp.initDataUnsafe.user;
+                return JSON.stringify({
+                    id: user.id,
+                    username: user.username,
+                    first_name: user.first_name,
+                    last_name: user.last_name
+                });
             }
+            return null;
+        };
 
-            if (typeof GetTelegramUserData === 'undefined') {
-                GetTelegramUserData = window.GetTelegramUserData;
+        window.ShowTelegramAlert = function (message) {
+            if (IsTelegramWebApp()) {
+                Telegram.WebApp.showAlert(message);
+            } else {
+                alert(message);
             }
+        };
 
-            console.log('Global functions initialized at', new Date().toISOString());
-        })();
+        window.SaveToTelegramStorage = function (key, value) {
+            if (IsTelegramWebApp() && Telegram.WebApp.CloudStorage) {
+                Telegram.WebApp.CloudStorage.setItem(key, value);
+                return true;
+            }
+            return false;
+        };
+
+        window.LoadFromTelegramStorage = function (key) {
+            if (IsTelegramWebApp() && Telegram.WebApp.CloudStorage) {
+                return Telegram.WebApp.CloudStorage.getItem(key);
+            }
+            return null;
+        };
+
+        window.RemoveFromTelegramStorage = function (key) {
+            if (IsTelegramWebApp() && Telegram.WebApp.CloudStorage) {
+                Telegram.WebApp.CloudStorage.removeItem(key);
+            }
+        };
     </script>
     <style>
         html, body {
@@ -166,37 +178,6 @@
         </div>
     </div>
     <script>
-        console.log('Functions available:', {
-            IsTelegramWebApp: typeof IsTelegramWebApp,
-            GetTelegramUserData: typeof GetTelegramUserData
-        });
-        function ShowTelegramAlert(message) {
-            if (IsTelegramWebApp()) {
-                Telegram.WebApp.showAlert(message);
-            } else {
-                alert(message);
-            }
-        }
-
-        function SaveToTelegramStorage(key, value) {
-            if (IsTelegramWebApp() && Telegram.WebApp.CloudStorage) {
-                Telegram.WebApp.CloudStorage.setItem(key, value);
-                return true;
-            }
-            return false;
-        }
-
-        function LoadFromTelegramStorage(key) {
-            if (IsTelegramWebApp() && Telegram.WebApp.CloudStorage) {
-                return Telegram.WebApp.CloudStorage.getItem(key);
-            }
-            return null;
-        }
-
-        // Но также сохраните в window для обратной совместимости
-        window.ShowTelegramAlert = ShowTelegramAlert;
-        window.SaveToTelegramStorage = SaveToTelegramStorage;
-        window.LoadFromTelegramStorage = LoadFromTelegramStorage;
 
         // Функция для принудительной вертикальной ориентации
         function enforcePortraitOrientation() {
