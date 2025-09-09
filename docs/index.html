@@ -5,29 +5,40 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, maximum-scale=1.0">
     <title>Ваша игра</title>
     <script>
-        // Важно: объявляем функции БЕЗ var/let/const для глобальной видимости
-        IsTelegramWebApp = function () {
-            return !!(window.Telegram && window.Telegram.WebApp);
-        };
+        // Регистрируем функции в глобальной области видимости для WebAssembly
+        (function () {
+            // Функция для проверки Telegram WebApp
+            window.IsTelegramWebApp = function () {
+                console.log('IsTelegramWebApp called');
+                return !!(window.Telegram && window.Telegram.WebApp);
+            };
 
-        GetTelegramUserData = function () {
-            if (window.Telegram && window.Telegram.WebApp && Telegram.WebApp.initDataUnsafe.user) {
-                const user = Telegram.WebApp.initDataUnsafe.user;
-                return JSON.stringify({
-                    id: user.id,
-                    username: user.username || '',
-                    first_name: user.first_name || '',
-                    last_name: user.last_name || ''
-                });
+            // Функция для получения данных пользователя Telegram
+            window.GetTelegramUserData = function () {
+                console.log('GetTelegramUserData called');
+                if (window.Telegram && window.Telegram.WebApp && Telegram.WebApp.initDataUnsafe.user) {
+                    const user = Telegram.WebApp.initDataUnsafe.user;
+                    return JSON.stringify({
+                        id: user.id,
+                        username: user.username || '',
+                        first_name: user.first_name || '',
+                        last_name: user.last_name || ''
+                    });
+                }
+                return null;
+            };
+
+            // Явно регистрируем функции в глобальной области видимости
+            if (typeof IsTelegramWebApp === 'undefined') {
+                IsTelegramWebApp = window.IsTelegramWebApp;
             }
-            return null;
-        };
 
-        // Для WebAssembly также нужно явно присвоить window
-        window.IsTelegramWebApp = IsTelegramWebApp;
-        window.GetTelegramUserData = GetTelegramUserData;
+            if (typeof GetTelegramUserData === 'undefined') {
+                GetTelegramUserData = window.GetTelegramUserData;
+            }
 
-        console.log('Global functions initialized at', new Date().toISOString());
+            console.log('Global functions initialized at', new Date().toISOString());
+        })();
     </script>
     <style>
         html, body {
