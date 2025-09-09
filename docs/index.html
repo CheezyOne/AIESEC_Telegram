@@ -129,17 +129,28 @@
         </div>
     </div>
     <script>
-        // Явное объявление в global scope
-        window.IsTelegramWebApp = function () {
+        IsTelegramWebApp = function () {
             return !!(window.Telegram && window.Telegram.WebApp);
         };
 
-        // Для WebAssembly
-        if (typeof IsTelegramWebApp === 'undefined') {
-            IsTelegramWebApp = window.IsTelegramWebApp;
-        }
-    </script>
-    <script>
+        // 2. Также объявите остальные функции, которые могут вызываться из C#
+        GetTelegramUserData = function () {
+            if (window.Telegram && window.Telegram.WebApp && Telegram.WebApp.initDataUnsafe.user) {
+                const user = Telegram.WebApp.initDataUnsafe.user;
+                return JSON.stringify({
+                    id: user.id,
+                    username: user.username || '',
+                    first_name: user.first_name || '',
+                    last_name: user.last_name || ''
+                });
+            }
+            return null;
+        };
+
+        // 3. Убедитесь, что функции доступны глобально
+        window.IsTelegramWebApp = IsTelegramWebApp;
+        window.GetTelegramUserData = GetTelegramUserData;
+
         // Глобальные функции для WebAssembly
         IsTelegramWebApp = function () {
             return !!(window.Telegram && window.Telegram.WebApp);
