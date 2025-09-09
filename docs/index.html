@@ -373,11 +373,15 @@
         });
 
         window.UnityFunctions = {
-            // Проверка доступности Telegram
+
             isTelegramAvailable: function () {
                 return !!(window.Telegram && window.Telegram.WebApp);
             },
 
+            // Проверка доступности CloudStorage
+            isCloudStorageAvailable: function () {
+                return !!(window.Telegram && window.Telegram.WebApp && window.Telegram.WebApp.CloudStorage);
+            },
             // Получение данных пользователя
             getTelegramUserData: function () {
                 if (window.Telegram && window.Telegram.WebApp && Telegram.WebApp.initDataUnsafe.user) {
