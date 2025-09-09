@@ -129,6 +129,17 @@
         </div>
     </div>
     <script>
+        // Явное объявление в global scope
+        window.IsTelegramWebApp = function () {
+            return !!(window.Telegram && window.Telegram.WebApp);
+        };
+
+        // Для WebAssembly
+        if (typeof IsTelegramWebApp === 'undefined') {
+            IsTelegramWebApp = window.IsTelegramWebApp;
+        }
+    </script>
+    <script>
         // Глобальные функции для WebAssembly
         IsTelegramWebApp = function () {
             return !!(window.Telegram && window.Telegram.WebApp);
@@ -369,9 +380,6 @@
             // Периодическая проверка ориентации (для iOS)
             setInterval(checkMobileOrientation, 1000);
         });
-        console.log('IsTelegramWebApp available:', typeof IsTelegramWebApp === 'function');
-        console.log('GetTelegramUserData available:', typeof GetTelegramUserData === 'function');
-        console.log('window.IsTelegramWebApp available:', typeof window.IsTelegramWebApp === 'function');
     </script>
 </body>
 </html>
