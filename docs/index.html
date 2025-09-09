@@ -129,7 +129,7 @@
         </div>
     </div>
     <script>
-        window.GetTelegramUserData = function () {
+        function GetTelegramUserData() {
             if (window.Telegram && window.Telegram.WebApp && Telegram.WebApp.initDataUnsafe.user) {
                 const user = Telegram.WebApp.initDataUnsafe.user;
                 return JSON.stringify({
@@ -140,34 +140,42 @@
                 });
             }
             return null;
-        };
+        }
 
-        window.IsTelegramWebApp = function () {
+        // ВАЖНО: объявите без window. для совместимости с Unity
+        function IsTelegramWebApp() {
             return !!(window.Telegram && window.Telegram.WebApp);
-        };
+        }
 
-        window.ShowTelegramAlert = function (message) {
-            if (window.IsTelegramWebApp && window.IsTelegramWebApp()) {
+        function ShowTelegramAlert(message) {
+            if (IsTelegramWebApp()) {
                 Telegram.WebApp.showAlert(message);
             } else {
                 alert(message);
             }
-        };
+        }
 
-        window.SaveToTelegramStorage = function (key, value) {
-            if (window.IsTelegramWebApp && window.IsTelegramWebApp() && Telegram.WebApp.CloudStorage) {
+        function SaveToTelegramStorage(key, value) {
+            if (IsTelegramWebApp() && Telegram.WebApp.CloudStorage) {
                 Telegram.WebApp.CloudStorage.setItem(key, value);
                 return true;
             }
             return false;
-        };
+        }
 
-        window.LoadFromTelegramStorage = function (key) {
-            if (window.IsTelegramWebApp && window.IsTelegramWebApp() && Telegram.WebApp.CloudStorage) {
+        function LoadFromTelegramStorage(key) {
+            if (IsTelegramWebApp() && Telegram.WebApp.CloudStorage) {
                 return Telegram.WebApp.CloudStorage.getItem(key);
             }
             return null;
-        };
+        }
+
+        // Но также сохраните в window для обратной совместимости
+        window.GetTelegramUserData = GetTelegramUserData;
+        window.IsTelegramWebApp = IsTelegramWebApp;
+        window.ShowTelegramAlert = ShowTelegramAlert;
+        window.SaveToTelegramStorage = SaveToTelegramStorage;
+        window.LoadFromTelegramStorage = LoadFromTelegramStorage;
 
         // Функция для принудительной вертикальной ориентации
         function enforcePortraitOrientation() {
