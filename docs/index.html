@@ -9,87 +9,109 @@
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
 
     <script>
-        // Предварительно объявляем функции-заглушки
-        window.IsTelegramWebApp = function () { return false; };
-        window.GetTelegramUserData = function () { return null; };
-        window.ShowTelegramAlert = function (message) { alert(message); return false; };
-        window.SaveToTelegramStorage = function (key, value) { return false; };
-        window.LoadFromTelegramStorage = function (key) { return null; };
-        window.RemoveFromTelegramStorage = function (key) { return false; };
+        // Глобальный объект для хранения функций Telegram
+        window.TelegramWebApp = {
+            // Функции-заглушки по умолчанию
+            IsTelegramWebApp: function () { return 0; },
+            GetTelegramUserData: function () { return null; },
+            ShowTelegramAlert: function (message) { alert(message); },
+            SaveToTelegramStorage: function (key, value) { return 0; },
+            LoadFromTelegramStorage: function (key) { return null; },
+            RemoveFromTelegramStorage: function (key) { },
 
-        // Основная инициализация Telegram API
-        document.addEventListener('DOMContentLoaded', function () {
-            if (window.Telegram && window.Telegram.WebApp) {
-                console.log('Telegram WebApp detected, upgrading functions...');
+            // Инициализация API Telegram
+            init: function () {
+                console.log('Initializing Telegram API...');
 
-                // Переопределяем функции на реальные
-                window.IsTelegramWebApp = function () { return true; };
+                // Проверяем, доступен ли Telegram WebApp
+                if (window.Telegram && window.Telegram.WebApp) {
+                    console.log('Telegram WebApp detected, upgrading functions...');
 
-                window.GetTelegramUserData = function () {
+                    // Переопределяем функции на реальные
+                    this.IsTelegramWebApp = function () { return 1; };
+
+                    this.GetTelegramUserData = function () {
+                        try {
+                            const user = Telegram.WebApp.initDataUnsafe.user;
+                            return user ? JSON.stringify({
+                                id: user.id,
+                                username: user.username || '',
+                                first_name: user.first_name || '',
+                                last_name: user.last_name || ''
+                            }) : null;
+                        } catch (e) {
+                            console.error('Error getting user data:', e);
+                            return null;
+                        }
+                    };
+
+                    this.ShowTelegramAlert = function (message) {
+                        try {
+                            Telegram.WebApp.showAlert(message);
+                        } catch (e) {
+                            console.error('Error showing alert:', e);
+                            alert(message);
+                        }
+                    };
+
+                    this.SaveToTelegramStorage = function (key, value) {
+                        try {
+                            Telegram.WebApp.CloudStorage.setItem(key, value);
+                            return 1;
+                        } catch (e) {
+                            console.error('Error saving to storage:', e);
+                            return 0;
+                        }
+                    };
+
+                    this.LoadFromTelegramStorage = function (key) {
+                        try {
+                            return Telegram.WebApp.CloudStorage.getItem(key);
+                        } catch (e) {
+                            console.error('Error loading from storage:', e);
+                            return null;
+                        }
+                    };
+
+                    this.RemoveFromTelegramStorage = function (key) {
+                        try {
+                            Telegram.WebApp.CloudStorage.removeItem(key);
+                        } catch (e) {
+                            console.error('Error removing from storage:', e);
+                        }
+                    };
+
+                    // Инициализируем Telegram WebApp
                     try {
-                        const user = Telegram.WebApp.initDataUnsafe.user;
-                        return user ? JSON.stringify({
-                            id: user.id,
-                            username: user.username || '',
-                            first_name: user.first_name || '',
-                            last_name: user.last_name || ''
-                        }) : null;
+                        Telegram.WebApp.ready();
+                        Telegram.WebApp.expand();
+                        console.log('Telegram WebApp initialized successfully');
                     } catch (e) {
-                        console.error('Error getting user data:', e);
-                        return null;
+                        console.error('Error initializing Telegram WebApp:', e);
                     }
-                };
+                } else {
+                    console.log('Telegram WebApp not detected, using fallback functions');
+                }
 
-                window.ShowTelegramAlert = function (message) {
-                    try {
-                        Telegram.WebApp.showAlert(message);
-                        return true;
-                    } catch (e) {
-                        console.error('Error showing alert:', e);
-                        alert(message);
-                        return false;
-                    }
-                };
+                // Экспортируем функции в глобальную область видимости для Unity
+                window.IsTelegramWebApp = this.IsTelegramWebApp;
+                window.GetTelegramUserData = this.GetTelegramUserData;
+                window.ShowTelegramAlert = this.ShowTelegramAlert;
+                window.SaveToTelegramStorage = this.SaveToTelegramStorage;
+                window.LoadFromTelegramStorage = this.LoadFromTelegramStorage;
+                window.RemoveFromTelegramStorage = this.RemoveFromTelegramStorage;
 
-                window.SaveToTelegramStorage = function (key, value) {
-                    try {
-                        Telegram.WebApp.CloudStorage.setItem(key, value);
-                        return true;
-                    } catch (e) {
-                        console.error('Error saving to storage:', e);
-                        return false;
-                    }
-                };
-
-                window.LoadFromTelegramStorage = function (key) {
-                    try {
-                        return Telegram.WebApp.CloudStorage.getItem(key);
-                    } catch (e) {
-                        console.error('Error loading from storage:', e);
-                        return null;
-                    }
-                };
-
-                window.RemoveFromTelegramStorage = function (key) {
-                    try {
-                        Telegram.WebApp.CloudStorage.removeItem(key);
-                        return true;
-                    } catch (e) {
-                        console.error('Error removing from storage:', e);
-                        return false;
-                    }
-                };
-
-                // Инициализируем Telegram WebApp
-                Telegram.WebApp.ready();
-                Telegram.WebApp.expand();
+                console.log('Telegram API initialized at', new Date().toISOString());
             }
-            console.log('Telegram functions initialized at', new Date().toISOString());
+        };
+
+        // Инициализируем API Telegram сразу после загрузки страницы
+        window.addEventListener('load', function () {
+            TelegramWebApp.init();
         });
     </script>
 
     <style>
-        /* Стили остаются без изменений */
         html, body {
             width: 100%;
             height: 100%;
