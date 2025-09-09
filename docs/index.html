@@ -129,7 +129,12 @@
         </div>
     </div>
     <script>
-        function GetTelegramUserData() {
+        // Глобальные функции для WebAssembly
+        IsTelegramWebApp = function () {
+            return !!(window.Telegram && window.Telegram.WebApp);
+        };
+
+        GetTelegramUserData = function () {
             if (window.Telegram && window.Telegram.WebApp && Telegram.WebApp.initDataUnsafe.user) {
                 const user = Telegram.WebApp.initDataUnsafe.user;
                 return JSON.stringify({
@@ -140,12 +145,13 @@
                 });
             }
             return null;
-        }
+        };
 
-        // ВАЖНО: объявите без window. для совместимости с Unity
-        function IsTelegramWebApp() {
-            return !!(window.Telegram && window.Telegram.WebApp);
-        }
+        // Для обратной совместимости
+        window.IsTelegramWebApp = IsTelegramWebApp;
+        window.GetTelegramUserData = GetTelegramUserData;
+    </script>
+    <script>
 
         function ShowTelegramAlert(message) {
             if (IsTelegramWebApp()) {
@@ -363,6 +369,9 @@
             // Периодическая проверка ориентации (для iOS)
             setInterval(checkMobileOrientation, 1000);
         });
+        console.log('IsTelegramWebApp available:', typeof IsTelegramWebApp === 'function');
+        console.log('GetTelegramUserData available:', typeof GetTelegramUserData === 'function');
+        console.log('window.IsTelegramWebApp available:', typeof window.IsTelegramWebApp === 'function');
     </script>
 </body>
 </html>
