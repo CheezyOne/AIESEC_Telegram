@@ -128,7 +128,47 @@
             <p>Для игры требуется портретная ориентация</p>
         </div>
     </div>
+    <script>
+        window.GetTelegramUserData = function () {
+            if (window.Telegram && window.Telegram.WebApp && Telegram.WebApp.initDataUnsafe.user) {
+                const user = Telegram.WebApp.initDataUnsafe.user;
+                return JSON.stringify({
+                    id: user.id,
+                    username: user.username || '',
+                    first_name: user.first_name || '',
+                    last_name: user.last_name || ''
+                });
+            }
+            return null;
+        };
 
+        window.IsTelegramWebApp = function () {
+            return !!(window.Telegram && window.Telegram.WebApp);
+        };
+
+        window.ShowTelegramAlert = function (message) {
+            if (window.IsTelegramWebApp && window.IsTelegramWebApp()) {
+                Telegram.WebApp.showAlert(message);
+            } else {
+                alert(message);
+            }
+        };
+
+        window.SaveToTelegramStorage = function (key, value) {
+            if (window.IsTelegramWebApp && window.IsTelegramWebApp() && Telegram.WebApp.CloudStorage) {
+                Telegram.WebApp.CloudStorage.setItem(key, value);
+                return true;
+            }
+            return false;
+        };
+
+        window.LoadFromTelegramStorage = function (key) {
+            if (window.IsTelegramWebApp && window.IsTelegramWebApp() && Telegram.WebApp.CloudStorage) {
+                return Telegram.WebApp.CloudStorage.getItem(key);
+            }
+            return null;
+        };
+    </script>
     <script>
 
         // Функция для принудительной вертикальной ориентации
@@ -218,12 +258,10 @@
             }
         }
 
-        if (window.Telegram && window.Telegram.WebApp) {
+        if (IsTelegramWebApp()) {
             Telegram.WebApp.ready();
             Telegram.WebApp.expand();
             console.log('Telegram WebApp initialized');
-        } else {
-            console.log('Not in Telegram environment');
         }
 
         // Обработчик изменения размера окна
@@ -319,47 +357,6 @@
             // Периодическая проверка ориентации (для iOS)
             setInterval(checkMobileOrientation, 1000);
         });
-    </script>
-    <script>
-        window.GetTelegramUserData = function () {
-            if (window.Telegram && window.Telegram.WebApp && Telegram.WebApp.initDataUnsafe.user) {
-                const user = Telegram.WebApp.initDataUnsafe.user;
-                return JSON.stringify({
-                    id: user.id,
-                    username: user.username || '',
-                    first_name: user.first_name || '',
-                    last_name: user.last_name || ''
-                });
-            }
-            return null;
-        };
-
-        window.IsTelegramWebApp = function () {
-            return !!(window.Telegram && window.Telegram.WebApp);
-        };
-
-        window.ShowTelegramAlert = function (message) {
-            if (window.IsTelegramWebApp && window.IsTelegramWebApp()) {
-                Telegram.WebApp.showAlert(message);
-            } else {
-                alert(message);
-            }
-        };
-
-        window.SaveToTelegramStorage = function (key, value) {
-            if (window.IsTelegramWebApp && window.IsTelegramWebApp() && Telegram.WebApp.CloudStorage) {
-                Telegram.WebApp.CloudStorage.setItem(key, value);
-                return true;
-            }
-            return false;
-        };
-
-        window.LoadFromTelegramStorage = function (key) {
-            if (window.IsTelegramWebApp && window.IsTelegramWebApp() && Telegram.WebApp.CloudStorage) {
-                return Telegram.WebApp.CloudStorage.getItem(key);
-            }
-            return null;
-        };
     </script>
 </body>
 </html>
