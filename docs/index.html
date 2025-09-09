@@ -5,20 +5,12 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, maximum-scale=1.0">
     <title>Ваша игра</title>
     <script>
-        // Явная регистрация в global scope для WebAssembly
-        if (typeof window !== 'undefined') {
-            window.IsTelegramWebApp = function () {
-                return !!(window.Telegram && window.Telegram.WebApp);
-            };
+        // Важно: объявляем функции БЕЗ var/let/const для глобальной видимости
+        IsTelegramWebApp = function () {
+            return !!(window.Telegram && window.Telegram.WebApp);
+        };
 
-            // Принудительно назначаем в global scope
-            if (typeof IsTelegramWebApp === 'undefined') {
-                IsTelegramWebApp = window.IsTelegramWebApp;
-            }
-        }
-
-        // То же самое для других функций
-        window.GetTelegramUserData = function () {
+        GetTelegramUserData = function () {
             if (window.Telegram && window.Telegram.WebApp && Telegram.WebApp.initDataUnsafe.user) {
                 const user = Telegram.WebApp.initDataUnsafe.user;
                 return JSON.stringify({
@@ -31,25 +23,11 @@
             return null;
         };
 
-        if (typeof GetTelegramUserData === 'undefined') {
-            GetTelegramUserData = window.GetTelegramUserData;
-        }
+        // Для WebAssembly также нужно явно присвоить window
+        window.IsTelegramWebApp = IsTelegramWebApp;
+        window.GetTelegramUserData = GetTelegramUserData;
 
-        console.log('Global functions registered:', {
-            IsTelegramWebApp: typeof IsTelegramWebApp,
-            GetTelegramUserData: typeof GetTelegramUserData
-        });
-
-        console.log('=== DEBUG: Global scope check ===');
-        console.log('window.IsTelegramWebApp:', typeof window.IsTelegramWebApp);
-        console.log('IsTelegramWebApp:', typeof IsTelegramWebApp);
-        console.log('window loaded:', window.loaded);
-
-        // Проверка, что функции доступны сразу
-        if (typeof IsTelegramWebApp !== 'function') {
-            console.error('ERROR: IsTelegramWebApp not found!');
-            IsTelegramWebApp = function () { return false; };
-        }
+        console.log('Global functions initialized at', new Date().toISOString());
     </script>
     <style>
         html, body {
@@ -177,7 +155,10 @@
         </div>
     </div>
     <script>
-
+        console.log('Functions available:', {
+            IsTelegramWebApp: typeof IsTelegramWebApp,
+            GetTelegramUserData: typeof GetTelegramUserData
+        });
         function ShowTelegramAlert(message) {
             if (IsTelegramWebApp()) {
                 Telegram.WebApp.showAlert(message);
