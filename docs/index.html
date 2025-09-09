@@ -154,7 +154,16 @@
     </div>
 
     <script>
-        console.log('JavaScript loaded, HandleUnityMessage available:', typeof window.HandleUnityMessage === 'function');
+        console.log('JavaScript loaded, checking global functions...');
+
+        // Простая проверка, что функции доступны
+        setTimeout(() => {
+            console.log('IsTelegramAvailable function available:', typeof window.IsTelegramAvailable === 'function');
+            console.log('GetTelegramUserData function available:', typeof window.GetTelegramUserData === 'function');
+            console.log('SaveToTelegramStorage function available:', typeof window.SaveToTelegramStorage === 'function');
+            console.log('LoadFromTelegramStorage function available:', typeof window.LoadFromTelegramStorage === 'function');
+            console.log('ShowTelegramAlert function available:', typeof window.ShowTelegramAlert === 'function');
+        }, 1000);
         // Глобальный объект для взаимодействия с Unity
         window.UnityBridge = {
             callbacks: {},
@@ -363,6 +372,77 @@
             setInterval(checkMobileOrientation, 1000);
         });
 
+        window.UnityFunctions = {
+            // Проверка доступности Telegram
+            isTelegramAvailable: function () {
+                return !!(window.Telegram && window.Telegram.WebApp);
+            },
+
+            // Получение данных пользователя
+            getTelegramUserData: function () {
+                if (window.Telegram && window.Telegram.WebApp && Telegram.WebApp.initDataUnsafe.user) {
+                    const user = Telegram.WebApp.initDataUnsafe.user;
+                    return JSON.stringify({
+                        id: user.id || '',
+                        username: user.username || '',
+                        first_name: user.first_name || '',
+                        last_name: user.last_name || ''
+                    });
+                }
+                return null;
+            },
+
+            // Сохранение данных
+            saveToTelegramStorage: function (key, value) {
+                if (window.Telegram && window.Telegram.WebApp && Telegram.WebApp.CloudStorage) {
+                    try {
+                        Telegram.WebApp.CloudStorage.setItem(key, value);
+                        return true;
+                    } catch (e) {
+                        console.error('Error saving to Telegram storage:', e);
+                        return false;
+                    }
+                }
+                return false;
+            },
+
+            // Загрузка данных
+            loadFromTelegramStorage: function (key) {
+                if (window.Telegram && window.Telegram.WebApp && Telegram.WebApp.CloudStorage) {
+                    try {
+                        return Telegram.WebApp.CloudStorage.getItem(key);
+                    } catch (e) {
+                        console.error('Error loading from Telegram storage:', e);
+                        return null;
+                    }
+                }
+                return null;
+            },
+
+            // Показ alert
+            showAlert: function (message) {
+                if (window.Telegram && window.Telegram.WebApp) {
+                    try {
+                        Telegram.WebApp.showAlert(message);
+                    } catch (e) {
+                        console.error('Error showing Telegram alert:', e);
+                        alert(message);
+                    }
+                } else {
+                    alert(message);
+                }
+            }
+        };
+
+        // Убедитесь, что функции доступны глобально
+        window.IsTelegramAvailable = window.UnityFunctions.isTelegramAvailable;
+        window.GetTelegramUserData = window.UnityFunctions.getTelegramUserData;
+        window.SaveToTelegramStorage = window.UnityFunctions.saveToTelegramStorage;
+        window.LoadFromTelegramStorage = window.UnityFunctions.loadFromTelegramStorage;
+        window.ShowTelegramAlert = window.UnityFunctions.showAlert;
+
+        console.log('Global functions registered for Unity interaction');
+
         // Функция для обработки сообщений от Unity
         function handleUnityMessage(message) {
             console.log('Unity message received:', message);
@@ -480,7 +560,6 @@
                 console.error('Error handling Unity message:', e);
             }
         }
-
 
         // Делаем функцию доступной глобально для вызова из Unity
         window.HandleUnityMessage = handleUnityMessage;
