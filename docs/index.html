@@ -154,6 +154,7 @@
     </div>
 
     <script>
+        console.log('JavaScript loaded, HandleUnityMessage available:', typeof window.HandleUnityMessage === 'function');
         // Глобальный объект для взаимодействия с Unity
         window.UnityBridge = {
             callbacks: {},
@@ -364,6 +365,7 @@
 
         // Функция для обработки сообщений от Unity
         function handleUnityMessage(message) {
+            console.log('Unity message received:', message);
             try {
                 console.log('Received message from Unity:', message);
                 const data = JSON.parse(message);
