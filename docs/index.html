@@ -4,54 +4,68 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, maximum-scale=1.0">
     <title>Ваша игра</title>
+
+    <!-- Загружаем Telegram WebApp SDK первым делом -->
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+
     <script>
-        // Определяем все функции глобально ДО загрузки Unity
-        window.IsTelegramWebApp = function () {
-            return !!(window.Telegram && window.Telegram.WebApp);
+        // Глобальные переменные для хранения функций
+        window.TelegramFunctions = {
+            IsTelegramWebApp: function () {
+                return !!(window.Telegram && window.Telegram.WebApp);
+            },
+            GetTelegramUserData: function () {
+                if (window.TelegramFunctions.IsTelegramWebApp()) {
+                    const user = Telegram.WebApp.initDataUnsafe.user;
+                    if (user) {
+                        return JSON.stringify({
+                            id: user.id,
+                            username: user.username || '',
+                            first_name: user.first_name || '',
+                            last_name: user.last_name || ''
+                        });
+                    }
+                }
+                return null;
+            },
+            ShowTelegramAlert: function (message) {
+                if (window.TelegramFunctions.IsTelegramWebApp()) {
+                    Telegram.WebApp.showAlert(message);
+                } else {
+                    alert(message);
+                }
+            },
+            SaveToTelegramStorage: function (key, value) {
+                if (window.TelegramFunctions.IsTelegramWebApp() && Telegram.WebApp.CloudStorage) {
+                    Telegram.WebApp.CloudStorage.setItem(key, value);
+                    return true;
+                }
+                return false;
+            },
+            LoadFromTelegramStorage: function (key) {
+                if (window.TelegramFunctions.IsTelegramWebApp() && Telegram.WebApp.CloudStorage) {
+                    return Telegram.WebApp.CloudStorage.getItem(key);
+                }
+                return null;
+            },
+            RemoveFromTelegramStorage: function (key) {
+                if (window.TelegramFunctions.IsTelegramWebApp() && Telegram.WebApp.CloudStorage) {
+                    Telegram.WebApp.CloudStorage.removeItem(key);
+                }
+            }
         };
 
-        window.GetTelegramUserData = function () {
-            if (IsTelegramWebApp()) {
-                const user = Telegram.WebApp.initDataUnsafe.user;
-                return JSON.stringify({
-                    id: user.id,
-                    username: user.username,
-                    first_name: user.first_name,
-                    last_name: user.last_name
-                });
-            }
-            return null;
-        };
+        // Экспортируем функции в глобальную область видимости для WASM
+        window.IsTelegramWebApp = function () { return window.TelegramFunctions.IsTelegramWebApp(); };
+        window.GetTelegramUserData = function () { return window.TelegramFunctions.GetTelegramUserData(); };
+        window.ShowTelegramAlert = function (message) { window.TelegramFunctions.ShowTelegramAlert(message); };
+        window.SaveToTelegramStorage = function (key, value) { return window.TelegramFunctions.SaveToTelegramStorage(key, value); };
+        window.LoadFromTelegramStorage = function (key) { return window.TelegramFunctions.LoadFromTelegramStorage(key); };
+        window.RemoveFromTelegramStorage = function (key) { window.TelegramFunctions.RemoveFromTelegramStorage(key); };
 
-        window.ShowTelegramAlert = function (message) {
-            if (IsTelegramWebApp()) {
-                Telegram.WebApp.showAlert(message);
-            } else {
-                alert(message);
-            }
-        };
-
-        window.SaveToTelegramStorage = function (key, value) {
-            if (IsTelegramWebApp() && Telegram.WebApp.CloudStorage) {
-                Telegram.WebApp.CloudStorage.setItem(key, value);
-                return true;
-            }
-            return false;
-        };
-
-        window.LoadFromTelegramStorage = function (key) {
-            if (IsTelegramWebApp() && Telegram.WebApp.CloudStorage) {
-                return Telegram.WebApp.CloudStorage.getItem(key);
-            }
-            return null;
-        };
-
-        window.RemoveFromTelegramStorage = function (key) {
-            if (IsTelegramWebApp() && Telegram.WebApp.CloudStorage) {
-                Telegram.WebApp.CloudStorage.removeItem(key);
-            }
-        };
+        console.log('Telegram functions initialized at', new Date().toISOString());
     </script>
+
     <style>
         html, body {
             width: 100%;
@@ -77,12 +91,11 @@
 
         #unity-canvas {
             background: #000000;
-            /* Фиксируем вертикальную ориентацию */
             width: auto;
             height: auto;
             max-width: 100%;
             max-height: 100%;
-            aspect-ratio: 9/16; /* Фиксируем соотношение сторон для вертикальной ориентации */
+            aspect-ratio: 9/16;
         }
 
         #unity-loading-bar {
@@ -115,7 +128,6 @@
             z-index: 1000;
         }
 
-        /* Стиль для блокировки ориентации на мобильных устройствах */
         #orientation-warning {
             display: none;
             position: fixed;
@@ -142,7 +154,6 @@
                 font-size: 18px;
             }
 
-        /* Иконка поворота для наглядности */
         .rotate-icon {
             font-size: 48px;
             margin-bottom: 20px;
@@ -159,7 +170,6 @@
             }
         }
     </style>
-
 </head>
 <body>
     <div id="unity-container">
@@ -170,125 +180,122 @@
         <div id="unity-warning"></div>
         <button id="unity-fullscreen-button" style="display: none;">Fullscreen</button>
 
-        <!-- Предупреждение о необходимости портретной ориентации -->
         <div id="orientation-warning">
             <div class="rotate-icon">🔄</div>
             <h2>Пожалуйста, переверните устройство</h2>
             <p>Для игры требуется портретная ориентация</p>
         </div>
     </div>
+
     <script>
+        // Проверяем доступность функций Telegram
+        function checkTelegramFunctions() {
+            const requiredFunctions = [
+                'IsTelegramWebApp',
+                'GetTelegramUserData',
+                'ShowTelegramAlert',
+                'SaveToTelegramStorage',
+                'LoadFromTelegramStorage',
+                'RemoveFromTelegramStorage'
+            ];
+
+            for (const funcName of requiredFunctions) {
+                if (typeof window[funcName] !== 'function') {
+                    console.error(`Missing function: ${funcName}`);
+                    return false;
+                }
+            }
+            return true;
+        }
 
         // Функция для принудительной вертикальной ориентации
         function enforcePortraitOrientation() {
             const canvas = document.querySelector("#unity-canvas");
             const container = document.querySelector("#unity-container");
-            const orientationWarning = document.querySelector("#orientation-warning");
-
-            // Всегда используем вертикальное соотношение сторон
-            const targetAspectRatio = 9 / 16; // Вертикальная ориентация
-
-            // Получаем доступные размеры
+            const targetAspectRatio = 9 / 16;
             const availableWidth = window.innerWidth;
             const availableHeight = window.innerHeight;
             const availableAspectRatio = availableWidth / availableHeight;
 
-            // Всегда устанавливаем вертикальную ориентацию
             if (availableAspectRatio > targetAspectRatio) {
-                // Широкое окно - центрируем по горизонтали
                 canvas.style.width = "auto";
                 canvas.style.height = "100%";
-
-                // Центрируем canvas в контейнере
                 container.style.justifyContent = "center";
             } else {
-                // Узкое окно - центрируем по вертикали
                 canvas.style.width = "100%";
                 canvas.style.height = "auto";
-
-                // Центрируем canvas в контейнере
                 container.style.justifyContent = "center";
             }
 
-            // На мобильных устройствах проверяем ориентацию
             if (/iPhone|iPad|iPod|Android/i.test(navigator.userAgent)) {
                 checkMobileOrientation();
             }
 
-            // Отправляем новые размеры в Unity, если игра загружена
             if (typeof unityInstance !== 'undefined') {
                 const canvasWidth = canvas.clientWidth;
                 const canvasHeight = canvas.clientHeight;
-
-                // Устанавливаем размеры для рендеринга
                 canvas.width = canvasWidth;
                 canvas.height = canvasHeight;
-
-                // Уведомляем Unity об изменении размеров
-                unityInstance.SendMessage('GameManager', 'OnWindowResize',
-                    canvasWidth + ',' + canvasHeight);
+                unityInstance.SendMessage('GameManager', 'OnWindowResize', canvasWidth + ',' + canvasHeight);
             }
         }
 
         function checkMobileOrientation() {
             const canvas = document.querySelector("#unity-canvas");
             const orientationWarning = document.querySelector("#orientation-warning");
-
-            // Проверяем, является ли устройство мобильным
             const isMobileDevice = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
 
-            console.log('Check orientation - is mobile:', isMobileDevice);
-
             if (!isMobileDevice) {
-                // На ПК всегда скрываем предупреждение и показываем игру
                 orientationWarning.style.display = "none";
                 canvas.style.visibility = "visible";
                 canvas.style.display = "block";
                 return;
             }
 
-            // Только для мобильных устройств проверяем ориентацию
-            const isLandscape =
-                window.innerWidth > window.innerHeight ||
+            const isLandscape = window.innerWidth > window.innerHeight ||
                 (window.orientation && Math.abs(window.orientation) === 90) ||
                 (screen.orientation && screen.orientation.type.includes('landscape'));
 
-            console.log('Is landscape:', isLandscape);
-
             if (isLandscape) {
-                // Горизонтальная ориентация - показываем предупреждение
                 orientationWarning.style.display = "flex";
                 canvas.style.visibility = "hidden";
             } else {
-                // Вертикальная ориентация - скрываем предупреждение
                 orientationWarning.style.display = "none";
                 canvas.style.visibility = "visible";
             }
         }
 
-        if (IsTelegramWebApp()) {
-            Telegram.WebApp.ready();
-            Telegram.WebApp.expand();
-            console.log('Telegram WebApp initialized');
+        // Инициализируем Telegram WebApp если доступно
+        function initTelegramWebApp() {
+            if (window.IsTelegramWebApp && window.IsTelegramWebApp()) {
+                Telegram.WebApp.ready();
+                Telegram.WebApp.expand();
+                console.log('Telegram WebApp initialized');
+            }
         }
 
-        // Обработчик изменения размера окна
+        // Обработчики событий
         window.addEventListener('resize', function () {
             enforcePortraitOrientation();
             checkMobileOrientation();
         });
 
-        // Обработчик изменения ориентации на мобильных устройствах
         window.addEventListener('orientationchange', function () {
-            // Задержка для корректного определения размеров после поворота
             setTimeout(function () {
                 enforcePortraitOrientation();
                 checkMobileOrientation();
             }, 300);
         });
 
-        // Вызываем после полной загрузки страницы
+        // Основная функция загрузки
         window.addEventListener('load', function () {
+            console.log('Page loaded, checking Telegram functions...');
+            if (!checkTelegramFunctions()) {
+                console.error('Some Telegram functions are missing!');
+            }
+
+            initTelegramWebApp();
+
             var container = document.querySelector("#unity-container");
             var canvas = document.querySelector("#unity-canvas");
             var loadingBar = document.querySelector("#unity-loading-bar");
@@ -329,7 +336,6 @@
                 showBanner: unityShowBanner,
             };
 
-            // Настройки для мобильных устройств
             if (/iPhone|iPad|iPod|Android/i.test(navigator.userAgent)) {
                 var meta = document.createElement('meta');
                 meta.name = 'viewport';
@@ -341,29 +347,27 @@
 
             var script = document.createElement("script");
             script.src = loaderUrl;
-            script.defer = true; // Добавьте defer
             script.onload = function () {
-                createUnityInstance(canvas, config, function (progress) {
-                    progressBarFull.style.width = 100 * progress + "%";
-                }).then(function (unityInstance) {
-                    loadingBar.style.display = "none";
-
-                    // Устанавливаем правильные размеры
-                    enforcePortraitOrientation();
-                    checkMobileOrientation();
-
-                }).catch(function (message) {
-                    alert(message);
-                });
+                // Небольшая задержка для гарантии инициализации функций
+                setTimeout(function () {
+                    createUnityInstance(canvas, config, function (progress) {
+                        progressBarFull.style.width = 100 * progress + "%";
+                    }).then(function (unityInstance) {
+                        loadingBar.style.display = "none";
+                        enforcePortraitOrientation();
+                        checkMobileOrientation();
+                    }).catch(function (message) {
+                        alert(message);
+                    });
+                }, 100);
             };
-
+            script.onerror = function () {
+                alert("Failed to load Unity script: " + loaderUrl);
+            };
             document.body.appendChild(script);
 
-            // Инициализируем ориентацию при загрузке
             enforcePortraitOrientation();
             checkMobileOrientation();
-
-            // Периодическая проверка ориентации (для iOS)
             setInterval(checkMobileOrientation, 1000);
         });
     </script>
