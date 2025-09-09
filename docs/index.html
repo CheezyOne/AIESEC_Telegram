@@ -212,7 +212,6 @@
                 const canvasHeight = canvas.clientHeight;
                 canvas.width = canvasWidth;
                 canvas.height = canvasHeight;
-                unityInstance.SendMessage('GameManager', 'OnWindowResize', canvasWidth + ',' + canvasHeight);
             }
         }
 
@@ -366,12 +365,14 @@
         // Функция для обработки сообщений от Unity
         function handleUnityMessage(message) {
             try {
+                console.log('Received message from Unity:', message);
                 const data = JSON.parse(message);
 
                 let result = null;
                 switch (data.name) {
                     case 'IsTelegramWebApp':
                         result = !!(window.Telegram && window.Telegram.WebApp);
+                        console.log('IsTelegramWebApp result:', result);
                         break;
                     case 'GetTelegramUserData':
                         if (window.Telegram && window.Telegram.WebApp && Telegram.WebApp.initDataUnsafe.user) {
@@ -382,9 +383,11 @@
                                 first_name: user.first_name || '',
                                 last_name: user.last_name || ''
                             });
+                            console.log('GetTelegramUserData result:', result);
                         }
                         break;
                     case 'ShowTelegramAlert':
+                        console.log('ShowTelegramAlert called with:', data.args[0]);
                         if (window.Telegram && window.Telegram.WebApp) {
                             try {
                                 Telegram.WebApp.showAlert(data.args[0]);
@@ -400,10 +403,12 @@
                         }
                         break;
                     case 'SaveToTelegramStorage':
+                        console.log('SaveToTelegramStorage called with:', data.args[0], data.args[1]);
                         if (window.Telegram && window.Telegram.WebApp && Telegram.WebApp.CloudStorage) {
                             try {
                                 Telegram.WebApp.CloudStorage.setItem(data.args[0], data.args[1]);
                                 result = "true";
+                                console.log('Data saved to Telegram storage successfully');
                             } catch (e) {
                                 console.error('Error saving to Telegram storage:', e);
                                 result = "false";
@@ -412,6 +417,7 @@
                             try {
                                 localStorage.setItem(data.args[0], data.args[1]);
                                 result = "true";
+                                console.log('Data saved to localStorage successfully');
                             } catch (e) {
                                 console.error('Error saving to localStorage:', e);
                                 result = "false";
@@ -419,9 +425,11 @@
                         }
                         break;
                     case 'LoadFromTelegramStorage':
+                        console.log('LoadFromTelegramStorage called with:', data.args[0]);
                         if (window.Telegram && window.Telegram.WebApp && Telegram.WebApp.CloudStorage) {
                             try {
                                 result = Telegram.WebApp.CloudStorage.getItem(data.args[0]);
+                                console.log('LoadFromTelegramStorage result:', result);
                             } catch (e) {
                                 console.error('Error loading from Telegram storage:', e);
                                 result = null;
@@ -429,6 +437,7 @@
                         } else {
                             try {
                                 result = localStorage.getItem(data.args[0]);
+                                console.log('LoadFromTelegramStorage result from localStorage:', result);
                             } catch (e) {
                                 console.error('Error loading from localStorage:', e);
                                 result = null;
@@ -436,10 +445,12 @@
                         }
                         break;
                     case 'RemoveFromTelegramStorage':
+                        console.log('RemoveFromTelegramStorage called with:', data.args[0]);
                         if (window.Telegram && window.Telegram.WebApp && Telegram.WebApp.CloudStorage) {
                             try {
                                 Telegram.WebApp.CloudStorage.removeItem(data.args[0]);
                                 result = "true";
+                                console.log('Data removed from Telegram storage successfully');
                             } catch (e) {
                                 console.error('Error removing from Telegram storage:', e);
                                 result = "false";
@@ -448,6 +459,7 @@
                             try {
                                 localStorage.removeItem(data.args[0]);
                                 result = "true";
+                                console.log('Data removed from localStorage successfully');
                             } catch (e) {
                                 console.error('Error removing from localStorage:', e);
                                 result = "false";
@@ -458,6 +470,7 @@
 
                 // Отправляем результат обратно в Unity
                 if (window.unityInstance && window.unityInstance.SendMessage) {
+                    console.log('Sending response to Unity:', { id: data.id, result: result });
                     window.unityInstance.SendMessage('JSBridge', 'ReceiveResponse',
                         JSON.stringify({ id: data.id, result: result }));
                 }
@@ -465,6 +478,7 @@
                 console.error('Error handling Unity message:', e);
             }
         }
+
 
         // Делаем функцию доступной глобально для вызова из Unity
         window.HandleUnityMessage = handleUnityMessage;
