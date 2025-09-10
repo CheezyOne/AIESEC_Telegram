@@ -200,27 +200,31 @@
         }
 
         // Асинхронная версия для C# callbacks
-        window.GetTelegramUserId = function (callback) {
-            const userId = window.GetTelegramUserIdSync();
-            if (callback && typeof callback === 'function') {
-                callback(userId);
+        window.GetTelegramUserId = function () {
+            try {
+                const userId = window.GetTelegramUserIdSync();
+                // Отправляем результат в Unity
+                if (window.unityInstance) {
+                    window.unityInstance.SendMessage('FirebaseManager', 'OnTelegramUserIdReceived', userId);
+                }
+            } catch (error) {
+                console.error('GetTelegramUserId error:', error);
+                // Fallback
+                const fallbackId = "anonymous_" + Math.random().toString(36).substring(2, 10);
+                if (window.unityInstance) {
+                    window.unityInstance.SendMessage('FirebaseManager', 'OnTelegramUserIdReceived', fallbackId);
+                }
             }
         };
 
-        // Синхронная версия
-        window.GetTelegramUserIdSync = function () {
-            if (window.Telegram && window.Telegram.WebApp && Telegram.WebApp.initDataUnsafe.user) {
-                return Telegram.WebApp.initDataUnsafe.user.id.toString();
-            }
-            return "anonymous_" + Math.random().toString(36).substring(2, 10);
-        };
-
-        // Асинхронная загрузка с callback
-        window.LoadFromFirebase = function (key, callback) {
+        // Загрузка данных из Firebase
+        window.LoadFromFirebase = function (key) {
             try {
                 if (!window.firebaseDatabase) {
                     const fallbackData = localStorage.getItem('firebase_fallback_' + key);
-                    if (callback) callback(fallbackData || "null");
+                    if (window.unityInstance) {
+                        window.unityInstance.SendMessage('FirebaseManager', 'OnDataLoaded', fallbackData || "null");
+                    }
                     return;
                 }
 
@@ -230,21 +234,39 @@
                 window.firebaseDatabase.ref(path).once('value').then(snapshot => {
                     if (snapshot.exists()) {
                         const result = JSON.stringify(snapshot.val());
-                        if (callback) callback(result);
+                        if (window.unityInstance) {
+                            window.unityInstance.SendMessage('FirebaseManager', 'OnDataLoaded', result);
+                        }
                     } else {
-                        if (callback) callback("null");
+                        if (window.unityInstance) {
+                            window.unityInstance.SendMessage('FirebaseManager', 'OnDataLoaded', "null");
+                        }
                     }
                 }).catch(error => {
                     console.error('Load error:', error);
                     const fallbackData = localStorage.getItem('firebase_fallback_' + key);
-                    if (callback) callback(fallbackData || "null");
+                    if (window.unityInstance) {
+                        window.unityInstance.SendMessage('FirebaseManager', 'OnDataLoaded', fallbackData || "null");
+                    }
                 });
             } catch (error) {
                 console.error('Load error:', error);
                 const fallbackData = localStorage.getItem('firebase_fallback_' + key);
-                if (callback) callback(fallbackData || "null");
+                if (window.unityInstance) {
+                    window.unityInstance.SendMessage('FirebaseManager', 'OnDataLoaded', fallbackData || "null");
+                }
             }
         };
+
+
+        // Синхронная версия
+        window.GetTelegramUserIdSync = function () {
+            if (window.Telegram && window.Telegram.WebApp && Telegram.WebApp.initDataUnsafe.user) {
+                return Telegram.WebApp.initDataUnsafe.user.id.toString();
+            }
+            return "anonymous_" + Math.random().toString(36).substring(2, 10);
+        };
+
 
         // Инициализируем Firebase после загрузки SDK
         function initializeFirebase() {
