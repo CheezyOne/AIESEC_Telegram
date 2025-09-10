@@ -348,17 +348,34 @@
 
         // Синхронное получение ID пользователя Telegram
         window.GetTelegramUserId = function () {
-            if (window.Telegram && window.Telegram.WebApp && Telegram.WebApp.initDataUnsafe.user) {
-                return Telegram.WebApp.initDataUnsafe.user.id.toString();
+            try {
+                let userId;
+                if (window.Telegram && window.Telegram.WebApp && Telegram.WebApp.initDataUnsafe.user) {
+                    userId = Telegram.WebApp.initDataUnsafe.user.id.toString();
+                } else {
+                    userId = "anonymous_" + Math.random().toString(36).substring(2, 10);
+                }
+
+                // Отправляем результат в Unity
+                if (window.unityInstance) {
+                    window.unityInstance.SendMessage('FirebaseManager', 'OnTelegramUserIdReceived', userId);
+                }
+                return userId;
+            } catch (error) {
+                console.error('GetTelegramUserId error:', error);
+                const fallbackId = "anonymous_" + Math.random().toString(36).substring(2, 10);
+                if (window.unityInstance) {
+                    window.unityInstance.SendMessage('FirebaseManager', 'OnTelegramUserIdReceived', fallbackId);
+                }
+                return fallbackId;
             }
-            return "anonymous_" + Math.random().toString(36).substring(2, 10);
         };
 
         // Синхронное сохранение (используем localStorage как fallback)
         window.SaveToFirebase = function (key, data) {
             try {
                 if (!window.firebaseDatabase) {
-                    // Fallback: сохраняем в localStorage
+                    console.warn('Firebase not available, using localStorage fallback');
                     localStorage.setItem('firebase_fallback_' + key, data);
                     return "true";
                 }
@@ -366,15 +383,14 @@
                 const userId = window.GetTelegramUserId();
                 const path = `users/${userId}/${key}`;
 
-                // Синхронное сохранение через транзакцию
-                window.firebaseDatabase.ref(path).transaction(() => {
-                    return JSON.parse(data);
-                }, (error) => {
-                    if (error) {
+                window.firebaseDatabase.ref(path).set(JSON.parse(data))
+                    .then(() => {
+                        console.log('Data saved to Firebase:', key);
+                    })
+                    .catch(error => {
                         console.error('Save error:', error);
                         localStorage.setItem('firebase_fallback_' + key, data);
-                    }
-                });
+                    });
 
                 return "true";
             } catch (error) {
@@ -388,41 +404,38 @@
         window.LoadFromFirebase = function (key) {
             try {
                 if (!window.firebaseDatabase) {
-                    // Fallback: загружаем из localStorage
+                    console.warn('Firebase not available, using localStorage fallback');
                     const fallbackData = localStorage.getItem('firebase_fallback_' + key);
+                    if (window.unityInstance) {
+                        window.unityInstance.SendMessage('FirebaseManager', 'OnDataLoaded', fallbackData || "null");
+                    }
                     return fallbackData || "null";
                 }
 
                 const userId = window.GetTelegramUserId();
                 const path = `users/${userId}/${key}`;
 
-                let result = "null";
-                let completed = false;
-
-                // Псевдо-синхронная загрузка
                 window.firebaseDatabase.ref(path).once('value').then(snapshot => {
+                    let result = "null";
                     if (snapshot.exists()) {
                         result = JSON.stringify(snapshot.val());
                     }
-                    completed = true;
+                    if (window.unityInstance) {
+                        window.unityInstance.SendMessage('FirebaseManager', 'OnDataLoaded', result);
+                    }
                 }).catch(error => {
                     console.error('Load error:', error);
                     const fallbackData = localStorage.getItem('firebase_fallback_' + key);
-                    result = fallbackData || "null";
-                    completed = true;
+                    if (window.unityInstance) {
+                        window.unityInstance.SendMessage('FirebaseManager', 'OnDataLoaded', fallbackData || "null");
+                    }
                 });
-
-                // Ждем завершения (осторожно! может заблокировать поток)
-                const startTime = Date.now();
-                while (!completed && Date.now() - startTime < 2000) {
-                    // Ждем максимум 2 секунды
-                }
-
-                return result;
             } catch (error) {
                 console.error('Load error:', error);
                 const fallbackData = localStorage.getItem('firebase_fallback_' + key);
-                return fallbackData || "null";
+                if (window.unityInstance) {
+                    window.unityInstance.SendMessage('FirebaseManager', 'OnDataLoaded', fallbackData || "null");
+                }
             }
         };
 
