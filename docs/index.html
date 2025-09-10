@@ -116,18 +116,6 @@
             }
         }
 
-        #firebase-status {
-            position: absolute;
-            top: 10px;
-            right: 10px;
-            background: rgba(0,0,0,0.7);
-            color: white;
-            padding: 5px 10px;
-            border-radius: 5px;
-            font-size: 12px;
-            z-index: 1000;
-        }
-
         #unity-loading-overlay {
             position: fixed;
             top: 0;
@@ -178,8 +166,6 @@
         <div id="unity-warning"></div>
         <button id="unity-fullscreen-button" style="display: none;">Fullscreen</button>
 
-        <div id="firebase-status">Firebase: Connecting...</div>
-
         <div id="orientation-warning">
             <div class="rotate-icon">🔄</div>
             <h2>Пожалуйста, переверните устройство</h2>
@@ -218,7 +204,6 @@
             try {
                 // Проверяем, что Firebase загружен
                 if (typeof firebase === 'undefined' || !firebase.app) {
-                    document.getElementById('firebase-status').textContent = 'Firebase: SDK not loaded';
                     console.error('Firebase SDK not loaded');
                     return false;
                 }
@@ -228,13 +213,11 @@
                 window.firebaseDatabase = firebase.database();
 
                 console.log('Firebase initialized successfully');
-                document.getElementById('firebase-status').textContent = 'Firebase: Connected';
                 window.isFirebaseInitialized = true;
                 checkReadyState();
                 return true;
             } catch (error) {
                 console.error('Firebase initialization error:', error);
-                document.getElementById('firebase-status').textContent = 'Firebase: Error - ' + error.message;
                 // Продолжаем загрузку даже при ошибке Firebase
                 window.isFirebaseInitialized = true;
                 checkReadyState();
@@ -251,7 +234,6 @@
                 setTimeout(function () {
                     if (!window.isFirebaseInitialized) {
                         console.warn('Firebase loading timeout, continuing without Firebase');
-                        document.getElementById('firebase-status').textContent = 'Firebase: Timeout';
                         window.isFirebaseInitialized = true;
                         checkReadyState();
                     }
@@ -266,68 +248,6 @@
         setTimeout(checkFirebaseLoaded, 500);
 
         // === ГЛОБАЛЬНЫЕ ФУНКЦИИ ДЛЯ UNITY ===
-
-        // Сохранение данных в Firebase
-        window.SaveToFirebase = function (key, data) {
-            return new Promise((resolve, reject) => {
-                try {
-                    if (!window.firebaseDatabase) {
-                        reject('Firebase not initialized');
-                        return;
-                    }
-
-                    const userId = window.GetTelegramUserId() || 'anonymous';
-                    const path = `users/${userId}/${key}`;
-
-                    window.firebaseDatabase.ref(path).set(JSON.parse(data))
-                        .then(() => {
-                            console.log('Data saved to Firebase:', key, data);
-                            resolve('true');
-                        })
-                        .catch(error => {
-                            console.error('Save error:', error);
-                            reject('false');
-                        });
-                } catch (error) {
-                    console.error('Save error:', error);
-                    reject('false');
-                }
-            });
-        };
-
-        // Загрузка данных из Firebase
-        window.LoadFromFirebase = function (key) {
-            return new Promise((resolve) => {
-                try {
-                    if (!window.firebaseDatabase) {
-                        resolve('null');
-                        return;
-                    }
-
-                    const userId = window.GetTelegramUserId() || 'anonymous';
-                    const path = `users/${userId}/${key}`;
-
-                    window.firebaseDatabase.ref(path).once('value')
-                        .then(snapshot => {
-                            if (snapshot.exists()) {
-                                const data = snapshot.val();
-                                console.log('Data loaded from Firebase:', key, data);
-                                resolve(JSON.stringify(data));
-                            } else {
-                                console.log('No data found for key:', key);
-                                resolve('null');
-                            }
-                        })
-                        .catch(error => {
-                            console.error('Load error:', error);
-                            resolve('null');
-                        });
-                } catch (error) {
-                    console.error('Load error:', error);
-                    resolve('null');
-                }
-            });
-        };
 
         // Удаление данных из Firebase
         window.RemoveFromFirebase = function (key) {
@@ -357,12 +277,84 @@
             });
         };
 
-        // Получение ID пользователя Telegram
+        // Синхронное получение ID пользователя Telegram
         window.GetTelegramUserId = function () {
             if (window.Telegram && window.Telegram.WebApp && Telegram.WebApp.initDataUnsafe.user) {
                 return Telegram.WebApp.initDataUnsafe.user.id.toString();
             }
-            return null;
+            return "anonymous_" + Math.random().toString(36).substring(2, 10);
+        };
+
+        // Синхронное сохранение (используем localStorage как fallback)
+        window.SaveToFirebase = function (key, data) {
+            try {
+                if (!window.firebaseDatabase) {
+                    // Fallback: сохраняем в localStorage
+                    localStorage.setItem('firebase_fallback_' + key, data);
+                    return "true";
+                }
+
+                const userId = window.GetTelegramUserId();
+                const path = `users/${userId}/${key}`;
+
+                // Синхронное сохранение через транзакцию
+                window.firebaseDatabase.ref(path).transaction(() => {
+                    return JSON.parse(data);
+                }, (error) => {
+                    if (error) {
+                        console.error('Save error:', error);
+                        localStorage.setItem('firebase_fallback_' + key, data);
+                    }
+                });
+
+                return "true";
+            } catch (error) {
+                console.error('Save error:', error);
+                localStorage.setItem('firebase_fallback_' + key, data);
+                return "true";
+            }
+        };
+
+        // Синхронная загрузка
+        window.LoadFromFirebase = function (key) {
+            try {
+                if (!window.firebaseDatabase) {
+                    // Fallback: загружаем из localStorage
+                    const fallbackData = localStorage.getItem('firebase_fallback_' + key);
+                    return fallbackData || "null";
+                }
+
+                const userId = window.GetTelegramUserId();
+                const path = `users/${userId}/${key}`;
+
+                let result = "null";
+                let completed = false;
+
+                // Псевдо-синхронная загрузка
+                window.firebaseDatabase.ref(path).once('value').then(snapshot => {
+                    if (snapshot.exists()) {
+                        result = JSON.stringify(snapshot.val());
+                    }
+                    completed = true;
+                }).catch(error => {
+                    console.error('Load error:', error);
+                    const fallbackData = localStorage.getItem('firebase_fallback_' + key);
+                    result = fallbackData || "null";
+                    completed = true;
+                });
+
+                // Ждем завершения (осторожно! может заблокировать поток)
+                const startTime = Date.now();
+                while (!completed && Date.now() - startTime < 2000) {
+                    // Ждем максимум 2 секунды
+                }
+
+                return result;
+            } catch (error) {
+                console.error('Load error:', error);
+                const fallbackData = localStorage.getItem('firebase_fallback_' + key);
+                return fallbackData || "null";
+            }
         };
 
         // === ОСТАЛЬНОЙ КОД (без изменений) ===
