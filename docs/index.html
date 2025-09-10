@@ -199,6 +199,53 @@
             }
         }
 
+        // Асинхронная версия для C# callbacks
+        window.GetTelegramUserId = function (callback) {
+            const userId = window.GetTelegramUserIdSync();
+            if (callback && typeof callback === 'function') {
+                callback(userId);
+            }
+        };
+
+        // Синхронная версия
+        window.GetTelegramUserIdSync = function () {
+            if (window.Telegram && window.Telegram.WebApp && Telegram.WebApp.initDataUnsafe.user) {
+                return Telegram.WebApp.initDataUnsafe.user.id.toString();
+            }
+            return "anonymous_" + Math.random().toString(36).substring(2, 10);
+        };
+
+        // Асинхронная загрузка с callback
+        window.LoadFromFirebase = function (key, callback) {
+            try {
+                if (!window.firebaseDatabase) {
+                    const fallbackData = localStorage.getItem('firebase_fallback_' + key);
+                    if (callback) callback(fallbackData || "null");
+                    return;
+                }
+
+                const userId = window.GetTelegramUserIdSync();
+                const path = `users/${userId}/${key}`;
+
+                window.firebaseDatabase.ref(path).once('value').then(snapshot => {
+                    if (snapshot.exists()) {
+                        const result = JSON.stringify(snapshot.val());
+                        if (callback) callback(result);
+                    } else {
+                        if (callback) callback("null");
+                    }
+                }).catch(error => {
+                    console.error('Load error:', error);
+                    const fallbackData = localStorage.getItem('firebase_fallback_' + key);
+                    if (callback) callback(fallbackData || "null");
+                });
+            } catch (error) {
+                console.error('Load error:', error);
+                const fallbackData = localStorage.getItem('firebase_fallback_' + key);
+                if (callback) callback(fallbackData || "null");
+            }
+        };
+
         // Инициализируем Firebase после загрузки SDK
         function initializeFirebase() {
             try {
