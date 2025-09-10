@@ -175,7 +175,33 @@
 
     <script>
         // === ИНИЦИАЛИЗАЦИЯ FIREBASE ===
-        // Глобальные функции для Unity
+        const firebaseConfig = {
+            apiKey: "AIzaSyBjthX7Q3Skv47WmVYew8ey_WaKxPc4XD4",
+            authDomain: "aiesec-c9872.firebaseapp.com",
+            databaseURL: "https://aiesec-c9872-default-rtdb.europe-west1.firebasedatabase.app",
+            projectId: "aiesec-c9872",
+            storageBucket: "aiesec-c9872.firebasestorage.app",
+            messagingSenderId: "503446839938",
+            appId: "1:503446839938:web:7e3ceb2086c63b8a28ca9b",
+            measurementId: "G-77CWZV4WVF"
+        };
+
+        // Глобальные переменные для хранения состояния
+        window.isFirebaseInitialized = false;
+        window.isUnityInitialized = false;
+
+        // Функция для проверки готовности к запуску игры
+        function checkReadyState() {
+            if (window.isFirebaseInitialized && window.isUnityInitialized) {
+                // Обе инициализации завершены, скрываем загрузочный экран
+                document.getElementById('unity-loading-overlay').style.display = 'none';
+                console.log('Game is ready to play!');
+            }
+        }
+
+        // === ГЛОБАЛЬНЫЕ ФУНКЦИИ ДЛЯ UNITY ===
+
+        // Получение ID пользователя Telegram
         window.GetTelegramUserId = function () {
             try {
                 let userId;
@@ -200,10 +226,12 @@
             }
         };
 
+        // Проверка готовности Firebase
         window.IsFirebaseReady = function () {
             return window.firebaseDatabase !== undefined && window.isFirebaseInitialized;
         };
 
+        // Загрузка данных из Firebase
         window.LoadFromFirebase = function (key) {
             try {
                 if (!window.firebaseDatabase) {
@@ -242,6 +270,7 @@
             }
         };
 
+        // Сохранение данных в Firebase
         window.SaveToFirebase = function (key, data) {
             try {
                 if (!window.firebaseDatabase) {
@@ -269,125 +298,6 @@
                 return "true";
             }
         };
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-        const firebaseConfig = {
-            apiKey: "AIzaSyBjthX7Q3Skv47WmVYew8ey_WaKxPc4XD4",
-            authDomain: "aiesec-c9872.firebaseapp.com",
-            databaseURL: "https://aiesec-c9872-default-rtdb.europe-west1.firebasedatabase.app",
-            projectId: "aiesec-c9872",
-            storageBucket: "aiesec-c9872.firebasestorage.app",
-            messagingSenderId: "503446839938",
-            appId: "1:503446839938:web:7e3ceb2086c63b8a28ca9b",
-            measurementId: "G-77CWZV4WVF"
-        };
-
-        // Глобальные переменные для хранения состояния
-        window.isFirebaseInitialized = false;
-        window.isUnityInitialized = false;
-
-        // Функция для проверки готовности к запуску игры
-        function checkReadyState() {
-            if (window.isFirebaseInitialized && window.isUnityInitialized) {
-                // Обе инициализации завершены, скрываем загрузочный экран
-                document.getElementById('unity-loading-overlay').style.display = 'none';
-                console.log('Game is ready to play!');
-            }
-        }
-
-
-        // Синхронная версия
-        window.GetTelegramUserIdSync = function () {
-            if (window.Telegram && window.Telegram.WebApp && Telegram.WebApp.initDataUnsafe.user) {
-                return Telegram.WebApp.initDataUnsafe.user.id.toString();
-            }
-            return "anonymous_" + Math.random().toString(36).substring(2, 10);
-        };
-
-
-        function initializeFirebase() {
-            try {
-                // Проверяем, что Firebase загружен
-                if (typeof firebase === 'undefined' || !firebase.app) {
-                    console.error('Firebase SDK not loaded');
-                    // Продолжаем без Firebase
-                    window.isFirebaseInitialized = true;
-                    checkReadyState();
-                    return false;
-                }
-
-                // Инициализируем Firebase
-                const app = firebase.initializeApp(firebaseConfig);
-                window.firebaseDatabase = firebase.database();
-
-                // Проверяем соединение
-                const connectedRef = firebase.database().ref(".info/connected");
-                connectedRef.on("value", function (snap) {
-                    if (snap.val() === true) {
-                        console.log("Firebase connected successfully");
-                        window.isFirebaseInitialized = true;
-                        checkReadyState();
-                    } else {
-                        console.log("Firebase not connected");
-                    }
-                });
-
-                // Таймаут для соединения
-                setTimeout(() => {
-                    if (!window.isFirebaseInitialized) {
-                        console.warn("Firebase connection timeout, continuing without Firebase");
-                        window.isFirebaseInitialized = true;
-                        checkReadyState();
-                    }
-                }, 5000);
-
-                return true;
-            } catch (error) {
-                console.error('Firebase initialization error:', error);
-                // Продолжаем без Firebase
-                window.isFirebaseInitialized = true;
-                checkReadyState();
-                return false;
-            }
-        };
-
-        // Ждем загрузки Firebase SDK
-        function checkFirebaseLoaded() {
-            if (typeof firebase !== 'undefined' && firebase.app) {
-                initializeFirebase();
-            } else {
-                // Если Firebase не загрузился через 3 секунды, продолжаем без него
-                setTimeout(function () {
-                    if (!window.isFirebaseInitialized) {
-                        console.warn('Firebase loading timeout, continuing without Firebase');
-                        window.isFirebaseInitialized = true;
-                        checkReadyState();
-                    }
-                }, 3000);
-
-                // Повторяем проверку через 100 мс
-                setTimeout(checkFirebaseLoaded, 100);
-            }
-        }
-
-        // Запускаем проверку загрузки Firebase
-        setTimeout(checkFirebaseLoaded, 500);
-
-        // === ГЛОБАЛЬНЫЕ ФУНКЦИИ ДЛЯ UNITY ===
 
         // Удаление данных из Firebase
         window.RemoveFromFirebase = function (key) {
@@ -417,7 +327,66 @@
             });
         };
 
-        // === ОСТАЛЬНОЙ КОД (без изменений) ===
+        // Синхронная версия получения ID пользователя
+        window.GetTelegramUserIdSync = function () {
+            if (window.Telegram && window.Telegram.WebApp && Telegram.WebApp.initDataUnsafe.user) {
+                return Telegram.WebApp.initDataUnsafe.user.id.toString();
+            }
+            return "anonymous_" + Math.random().toString(36).substring(2, 10);
+        };
+
+        // Инициализация Firebase
+        function initializeFirebase() {
+            try {
+                // Проверяем, что Firebase загружен
+                if (typeof firebase === 'undefined' || !firebase.app) {
+                    console.error('Firebase SDK not loaded');
+                    // Продолжаем без Firebase
+                    window.isFirebaseInitialized = true;
+                    checkReadyState();
+                    return false;
+                }
+
+                // Инициализируем Firebase
+                const app = firebase.initializeApp(firebaseConfig);
+                window.firebaseDatabase = firebase.database();
+
+                console.log('Firebase initialized successfully');
+                window.isFirebaseInitialized = true;
+                checkReadyState();
+                return true;
+            } catch (error) {
+                console.error('Firebase initialization error:', error);
+                // Продолжаем без Firebase
+                window.isFirebaseInitialized = true;
+                checkReadyState();
+                return false;
+            }
+        }
+
+        // Ждем загрузки Firebase SDK
+        function checkFirebaseLoaded() {
+            if (typeof firebase !== 'undefined' && firebase.app) {
+                initializeFirebase();
+            } else {
+                // Если Firebase не загрузился через 3 секунды, продолжаем без него
+                setTimeout(function () {
+                    if (!window.isFirebaseInitialized) {
+                        console.warn('Firebase loading timeout, continuing without Firebase');
+                        window.isFirebaseInitialized = true;
+                        checkReadyState();
+                    }
+                }, 3000);
+
+                // Повторяем проверку через 100 мс
+                setTimeout(checkFirebaseLoaded, 100);
+            }
+        }
+
+        // Запускаем проверку загрузки Firebase
+        setTimeout(checkFirebaseLoaded, 500);
+
+        // === ОСТАЛЬНОЙ КОД ===
 
         // Инициализация Telegram WebApp
         function initTelegramWebApp() {
