@@ -127,9 +127,49 @@
             font-size: 12px;
             z-index: 1000;
         }
+
+        #unity-loading-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: #000000;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            flex-direction: column;
+            z-index: 9998;
+        }
+
+        .loading-spinner {
+            width: 50px;
+            height: 50px;
+            border: 5px solid rgba(255, 255, 255, 0.3);
+            border-radius: 50%;
+            border-top-color: #fff;
+            animation: spin 1s ease-in-out infinite;
+        }
+
+        @keyframes spin {
+            to {
+                transform: rotate(360deg);
+            }
+        }
+
+        .loading-text {
+            color: white;
+            margin-top: 20px;
+            font-family: Arial, sans-serif;
+        }
     </style>
 </head>
 <body>
+    <div id="unity-loading-overlay">
+        <div class="loading-spinner"></div>
+        <div class="loading-text">Загрузка игры...</div>
+    </div>
+
     <div id="unity-container">
         <canvas id="unity-canvas"></canvas>
         <div id="unity-loading-bar">
@@ -160,6 +200,19 @@
             measurementId: "G-77CWZV4WVF"
         };
 
+        // Глобальные переменные для хранения состояния
+        window.isFirebaseInitialized = false;
+        window.isUnityInitialized = false;
+
+        // Функция для проверки готовности к запуску игры
+        function checkReadyState() {
+            if (window.isFirebaseInitialized && window.isUnityInitialized) {
+                // Обе инициализации завершены, скрываем загрузочный экран
+                document.getElementById('unity-loading-overlay').style.display = 'none';
+                console.log('Game is ready to play!');
+            }
+        }
+
         // Инициализируем Firebase после загрузки SDK
         function initializeFirebase() {
             try {
@@ -176,10 +229,15 @@
 
                 console.log('Firebase initialized successfully');
                 document.getElementById('firebase-status').textContent = 'Firebase: Connected';
+                window.isFirebaseInitialized = true;
+                checkReadyState();
                 return true;
             } catch (error) {
                 console.error('Firebase initialization error:', error);
                 document.getElementById('firebase-status').textContent = 'Firebase: Error - ' + error.message;
+                // Продолжаем загрузку даже при ошибке Firebase
+                window.isFirebaseInitialized = true;
+                checkReadyState();
                 return false;
             }
         }
@@ -189,6 +247,16 @@
             if (typeof firebase !== 'undefined' && firebase.app) {
                 initializeFirebase();
             } else {
+                // Если Firebase не загрузился через 3 секунды, продолжаем без него
+                setTimeout(function () {
+                    if (!window.isFirebaseInitialized) {
+                        console.warn('Firebase loading timeout, continuing without Firebase');
+                        document.getElementById('firebase-status').textContent = 'Firebase: Timeout';
+                        window.isFirebaseInitialized = true;
+                        checkReadyState();
+                    }
+                }, 3000);
+
                 // Повторяем проверку через 100 мс
                 setTimeout(checkFirebaseLoaded, 100);
             }
@@ -297,8 +365,208 @@
             return null;
         };
 
-        // Удаляем функцию IsFirebaseAvailable, так как она больше не нужна
-        // Вместо этого будем использовать проверку window.firebaseDatabase
+        // === ОСТАЛЬНОЙ КОД (без изменений) ===
+
+        // Инициализация Telegram WebApp
+        function initTelegramWebApp() {
+            if (window.Telegram && window.Telegram.WebApp) {
+                try {
+                    Telegram.WebApp.ready();
+                    Telegram.WebApp.expand();
+                    console.log('Telegram WebApp initialized successfully');
+                } catch (e) {
+                    console.error('Error initializing Telegram WebApp:', e);
+                }
+            } else {
+                console.log('Telegram WebApp not detected');
+            }
+        }
+
+        // Функция для принудительной вертикальной ориентации
+        function enforcePortraitOrientation() {
+            const canvas = document.querySelector("#unity-canvas");
+            const container = document.querySelector("#unity-container");
+            const targetAspectRatio = 9 / 16;
+            const availableWidth = window.innerWidth;
+            const availableHeight = window.innerHeight;
+            const availableAspectRatio = availableWidth / availableHeight;
+
+            if (availableAspectRatio > targetAspectRatio) {
+                canvas.style.width = "auto";
+                canvas.style.height = "100%";
+                container.style.justifyContent = "center";
+            } else {
+                canvas.style.width = "100%";
+                canvas.style.height = "auto";
+                container.style.justifyContent = "center";
+            }
+
+            if (/iPhone|iPad|iPod|Android/i.test(navigator.userAgent)) {
+                checkMobileOrientation();
+            }
+
+            if (typeof unityInstance !== 'undefined') {
+                const canvasWidth = canvas.clientWidth;
+                const canvasHeight = canvas.clientHeight;
+                canvas.width = canvasWidth;
+                canvas.height = canvasHeight;
+            }
+        }
+
+        function checkMobileOrientation() {
+            const canvas = document.querySelector("#unity-canvas");
+            const orientationWarning = document.querySelector("#orientation-warning");
+            const isMobileDevice = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
+
+            if (!isMobileDevice) {
+                orientationWarning.style.display = "none";
+                canvas.style.visibility = "visible";
+                canvas.style.display = "block";
+                return;
+            }
+
+            const isLandscape = window.innerWidth > window.innerHeight ||
+                (window.orientation && Math.abs(window.orientation) === 90) ||
+                (screen.orientation && screen.orientation.type.includes('landscape'));
+
+            if (isLandscape) {
+                orientationWarning.style.display = "flex";
+                canvas.style.visibility = "hidden";
+            } else {
+                orientationWarning.style.display = "none";
+                canvas.style.visibility = "visible";
+            }
+        }
+
+        // Обработчики событий
+        window.addEventListener('resize', function () {
+            enforcePortraitOrientation();
+            checkMobileOrientation();
+        });
+
+        window.addEventListener('orientationchange', function () {
+            setTimeout(function () {
+                enforcePortraitOrientation();
+                checkMobileOrientation();
+            }, 300);
+        });
+
+        // Основная функция загрузки
+        window.addEventListener('load', function () {
+            console.log('Page loaded, initializing Telegram WebApp...');
+            initTelegramWebApp();
+
+            var container = document.querySelector("#unity-container");
+            var canvas = document.querySelector("#unity-canvas");
+            var loadingBar = document.querySelector("#unity-loading-bar");
+            var progressBarFull = document.querySelector("#unity-progress-bar-full");
+            var warningBanner = document.querySelector("#unity-warning");
+
+            function unityShowBanner(msg, type) {
+                function updateBannerVisibility() {
+                    warningBanner.style.display = warningBanner.children.length ? 'block' : 'none';
+                }
+                var div = document.createElement('div');
+                div.innerHTML = msg;
+                warningBanner.appendChild(div);
+                if (type == 'error') {
+                    div.style = 'background: red; padding: 10px; color: white;';
+                } else {
+                    if (type == 'warning') {
+                        div.style = 'background: yellow; padding: 10px;';
+                    }
+                    setTimeout(function () {
+                        warningBanner.removeChild(div);
+                        updateBannerVisibility();
+                    }, 5000);
+                }
+                updateBannerVisibility();
+            }
+
+            var buildUrl = "Build";
+            var loaderUrl = buildUrl + "/docs.loader.js";
+            var config = {
+                dataUrl: buildUrl + "/docs.data",
+                frameworkUrl: buildUrl + "/docs.framework.js",
+                codeUrl: buildUrl + "/docs.wasm",
+                streamingAssetsUrl: "StreamingAssets",
+                companyName: "DefaultCompany",
+                productName: "AIESEC",
+                productVersion: "1.0",
+                showBanner: unityShowBanner,
+            };
+
+            if (/iPhone|iPad|iPod|Android/i.test(navigator.userAgent)) {
+                var meta = document.createElement('meta');
+                meta.name = 'viewport';
+                meta.content = 'width=device-width, height=device-height, initial-scale=1.0, user-scalable=no, shrink-to-fit=yes';
+                document.getElementsByTagName('head')[0].appendChild(meta);
+            }
+
+            // Автоматически загружаем Unity без кнопки
+            loadingBar.style.display = "block";
+            var script = document.createElement("script");
+            script.src = loaderUrl;
+            script.onload = function () {
+                setTimeout(function () {
+                    createUnityInstance(canvas, config, function (progress) {
+                        progressBarFull.style.width = 100 * progress + "%";
+                    }).then(function (unityInstance) {
+                        window.unityInstance = unityInstance;
+                        loadingBar.style.display = "none";
+                        enforcePortraitOrientation();
+                        checkMobileOrientation();
+                        console.log("Unity instance created successfully");
+                        window.isUnityInitialized = true;
+                        checkReadyState();
+                    }).catch(function (message) {
+                        console.error('Unity initialization failed: ', message);
+                        alert('Unity initialization failed: ' + message);
+                        // Даже при ошибке Unity помечаем инициализацию как завершенную
+                        window.isUnityInitialized = true;
+                        checkReadyState();
+                    });
+                }, 100);
+            };
+            script.onerror = function () {
+                console.error("Failed to load Unity script: " + loaderUrl);
+                alert("Failed to load Unity script: " + loaderUrl);
+                // Даже при ошибке помечаем инициализацию как завершенную
+                window.isUnityInitialized = true;
+                checkReadyState();
+            };
+            document.body.appendChild(script);
+
+            enforcePortraitOrientation();
+            checkMobileOrientation();
+            setInterval(checkMobileOrientation, 1000);
+        });
+
+        window.GetTelegramUserData = function () {
+            if (window.Telegram && window.Telegram.WebApp && Telegram.WebApp.initDataUnsafe.user) {
+                const user = Telegram.WebApp.initDataUnsafe.user;
+                return JSON.stringify({
+                    id: user.id || '',
+                    username: user.username || '',
+                    first_name: user.first_name || '',
+                    last_name: user.last_name || ''
+                });
+            }
+            return null;
+        };
+
+        window.ShowTelegramAlert = function (message) {
+            if (window.Telegram && window.Telegram.WebApp) {
+                try {
+                    Telegram.WebApp.showAlert(message);
+                } catch (e) {
+                    console.error('Error showing Telegram alert:', e);
+                    alert(message);
+                }
+            } else {
+                alert(message);
+            }
+        };
     </script>
 </body>
 </html>
